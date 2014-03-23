@@ -20,6 +20,10 @@
 %assign SYS_CONNECT         3
 %assign SYS_SEND            9
 %assign SYS_RECV            10
+%assign SYS_READ			3
+%assign SYS_WRITE           4
+%assign stdout           	1
+%assign stdin				0
  
 section .text
   global _start
@@ -101,8 +105,8 @@ _exit:
 _print:
   ; Docstring: Print the string in edx (length stored in ecx)
   ; ----
-  mov ebx, 1
-  mov eax, 4  
+  mov ebx, stdout
+  mov eax, SYS_WRITE
   int 0x80   
   ret         
 
@@ -163,50 +167,59 @@ _start:
   jnz short _fail
   ; Move the message we want to send to eax (and it's length to ecx)
   jmp _readInput
-  mov eax, msg
-  mov ecx, msglen
-  ; run the send() function
-  call _send
-  ; Yeah baby, we're done!
-  call _exit
-;---------------
-_readInput:
-  mov  eax,4		;sys_wite
-  mov  ebx,1		;To stdout
-  mov  ecx,msg		;'Input some data: '
-  mov  edx,msglen	
-  int  80h		;Call kernel
 
-  mov  eax,3		;sys_read. Read what user inputs
-  mov  ebx,0		;From stdin
-  mov  ecx, inp_buf	;Save user input to buffer.
-  mov edx, 256         ;; No of bytes to read.
-  int    80h
+
+_readInput:
+  ; Docstring: Read an input from the user and send it over the socket
+  ; ----
+  ; Prompt the user for input
+  mov  ecx,prompt
+  mov  edx,promptlen	
+  call _print
+  
+  ; Read the user response and store it in
+  mov  eax,SYS_READ
+  mov  ebx,stdin
+  ; Buffer to save input in
+  mov  ecx, msg
+  ; Number of bytes to read
+  mov edx, 256
+  int 80h
+  ; Push the return value (the input length) to stack
   push eax
-  mov eax, inp_buf
+  ; Move the input itself to eax
+  mov eax, msg
+  ; Pop the msg length into ecx
   pop ecx
+  ; Send the message over the socket
   call _send
+  ; Thats it for today.
   call _exit
-;-------------
+
+
 _fail:
   ; In case something wen't wrong, print an error msg and quit.
   mov edx, cerrlen
   mov ecx, cerrmsg
   call _print
   call _exit
- 
- 
+
+
 _recverr: 
   call _exit
 
+
 _dced: 
   call _exit
- 
+
+
 section .data
+; The error messsage if we couldn't connect
 cerrmsg      db 'failed to connect :(',0xa
 cerrlen      equ $-cerrmsg
-msg          db 'Enter your message:',0xa
-msglen       equ $-msg
+; The prompt text for getting input from the user
+prompt          db 'Enter your message:',0xa
+promptlen       equ $-prompt
  
 szIp         db '127.0.0.1',0
 szPort       db '1728',0
@@ -234,4 +247,6 @@ sockaddr_in resb 16
 sport       resb 2
 ; data buffer
 buff        resb 1024
-inp_buf resb 256
+
+; The buffer to hold the user's data
+msg resb 256
