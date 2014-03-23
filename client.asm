@@ -5,7 +5,12 @@
 ;link
 ;  ld -o socket socket.o
 ;
+; My Version:
+;		nasm -o socket.o -f elf32 -g client.asm 
+;		ld -m elf_i386 socket.o -o client
+
 ;
+
 ;Just some assigns for better readability
  
 %assign SOCK_STREAM         1
@@ -20,12 +25,17 @@ section .text
   global _start
  
 ;--------------------------------------------------
-;Functions to make things easier. :]
+;Functions to make things easier.
 ;--------------------------------------------------
 _socket:
-  mov [cArray+0], dword AF_INET
-  mov [cArray+4], dword SOCK_STREAM
-  mov [cArray+8], dword 0
+  ; Docstring: Create a Socket from the data found in cArray and return the socket's file descriptor
+  ; ----
+  ;Our socket's address's family - Internet Protocol, in this case
+  mov [cArray + 0], dword AF_INET
+  ; Stream protocol - TCP Here
+  mov [cArray + 4], dword SOCK_STREAM
+  mov [cArray + 8], dword 0
+  ; Call the socket API
   mov eax, SYS_socketcall
   mov ebx, SYS_SOCKET
   mov ecx, cArray
@@ -33,15 +43,26 @@ _socket:
   ret
  
 _connect:
+  ; Docstring: Connect to the socket
+  ; ----
+  ; Get a socket
   call _socket
+  ; Move the socket fd recived into sock
   mov dword [sock], eax
+  ; Get the pointer to the socket address (sockaddr) from the source register (SI)
   mov dx, si
-  mov byte [edi+3], dl
-  mov byte [edi+2], dh
-  mov [cArray+0], eax     ;sock;
-  mov [cArray+4], edi     ;&sockaddr_in;
+  mov byte [edi + 3], dl
+  mov byte [edi + 2], dh
+  ; We are now calling connect, which takes three arguments: socket fd, pointer to sockaddr and the length of sockaddr.
+  ; We will store those arguments in a 'array' and then call the interrupt:
+  ; sockfd
+  mov [cArray + 0], eax
+  ; &sockaddr_in
+  mov [cArray + 4], edi
+  ; 16 is the length for IPv4. This is equal to sizeof(sockaddr_in) in C
   mov edx, 16
-  mov [cArray+8], edx   ;sizeof(sockaddr_in);
+  mov [cArray + 8], edx
+  ; Call the connect interrupt with the data we provided.
   mov eax, SYS_socketcall
   mov ebx, SYS_CONNECT
   mov ecx, cArray
@@ -49,11 +70,20 @@ _connect:
   ret
  
 _send:
+  ; Docstring: send a message across a socket
+  ; ----
+  ; Get the socket into a register...
   mov edx, [sock]
-  mov [sArray+0],edx
-  mov [sArray+4],eax
-  mov [sArray+8],ecx
-  mov [sArray+12], dword 0
+  ; send() take three argument: socket fd, data buffer to send, the size of said buffer, and some flags:
+  ; sockfd
+  mov [sArray + 0], edx
+  ; data buffer (the data we're sending)
+  mov [sArray + 4], eax
+  ; length of the buffer
+  mov [sArray + 8], ecx
+  ; we don't want any flags...
+  mov [sArray + 12], dword 0
+  ; Call the socket API
   mov eax, SYS_socketcall
   mov ebx, SYS_SEND
   mov ecx, sArray
@@ -61,16 +91,21 @@ _send:
   ret
  
 _exit:
+  ; Docstring: Finish the run and return control to the OS
+  ; ----
   push 0x1
   mov eax, 1
   push eax
   int 0x80
  
 _print:
+  ; Docstring: Print the string in edx (length stored in ecx)
+  ; ----
   mov ebx, 1
   mov eax, 4  
   int 0x80   
   ret         
+
 ;--------------------------------------------------
 ;Main code body
 ;--------------------------------------------------
@@ -144,20 +179,25 @@ szIp         db '127.0.0.1',0
 szPort       db '1728',0
  
 section .bss
+; Allocate uninitialized memory the socket we're going to create
 sock         resd 1
-;general 'array' for syscall_socketcall argument arg.
+
+; I'm using cArray as a general 'array' for syscall_socketcall argument arg.
 cArray       resd 1
              resd 1
-	     resd 1
+             resd 1
              resd 1
  
-;send 'array'.
+; 'array' of things to send
 sArray      resd 1
             resd 1
             resd 1
             resd 1
-;duh?
+
+; sockaddr_in is a C struct used by the sockets API to store information about the socket (Address family, port and address)
 sockaddr_in resb 16
-;..
+
+; socket port
 sport       resb 2
+; data buffer
 buff        resb 1024
