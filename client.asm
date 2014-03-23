@@ -111,11 +111,15 @@ _print:
 ;--------------------------------------------------
  
 _start:
-  mov esi, szIp    
+  ; Move the socket IP string to SI
+  mov esi, szIp
+  ; Move the uninitialized sockaddr_in to edi
   mov edi, sockaddr_in
+  ; Clear EAX, ECX, EDX
   xor eax,eax
   xor ecx,ecx
   xor edx,edx
+  ; Initialize sockaddr_in
   .cc:
     xor   ebx,ebx
   .c:
@@ -127,15 +131,17 @@ _start:
     add   ebx,eax
     jmp   short .c
   .next:
-    mov   [edi+ecx+4],bl
+    mov   [edi + ecx + 4],bl
     inc   ecx
     cmp   ecx,byte 4
     jne   .cc
- 
-  mov word [edi], AF_INET 
+  ; Move the desired address family to edi
+  mov word [edi], AF_INET
+  ; Move the port string to esi
   mov esi, szPort 
   xor eax,eax
   xor ebx,ebx
+  ; Initialize sport
   .nextstr1:   
     lodsb      
     test al,al
@@ -147,17 +153,43 @@ _start:
   .ret1:
     xchg ebx,eax   
     mov [sport], eax
- 
-  mov si, [sport]  
+ ; Move the socket port to si
+  mov si, [sport]
+  ; Create and connect to the socket
   call _connect
+  ; If the connection failed for some reason, it'll return an error code (err != 0)
   cmp eax, 0
+  ; If we had en error, call fail() to log it
   jnz short _fail
+  ; Move the message we want to send to eax (and it's length to ecx)
+  jmp _readInput
   mov eax, msg
   mov ecx, msglen
+  ; run the send() function
+  call _send
+  ; Yeah baby, we're done!
+  call _exit
+;---------------
+_readInput:
+  mov  eax,4		;sys_wite
+  mov  ebx,1		;To stdout
+  mov  ecx,msg		;'Input some data: '
+  mov  edx,msglen	
+  int  80h		;Call kernel
+
+  mov  eax,3		;sys_read. Read what user inputs
+  mov  ebx,0		;From stdin
+  mov  ecx, inp_buf	;Save user input to buffer.
+  mov edx, 256         ;; No of bytes to read.
+  int    80h
+  push eax
+  mov eax, inp_buf
+  pop ecx
   call _send
   call _exit
- 
+;-------------
 _fail:
+  ; In case something wen't wrong, print an error msg and quit.
   mov edx, cerrlen
   mov ecx, cerrmsg
   call _print
@@ -166,13 +198,14 @@ _fail:
  
 _recverr: 
   call _exit
+
 _dced: 
   call _exit
  
 section .data
 cerrmsg      db 'failed to connect :(',0xa
 cerrlen      equ $-cerrmsg
-msg          db 'Hello socket world!',0xa
+msg          db 'Enter your message:',0xa
 msglen       equ $-msg
  
 szIp         db '127.0.0.1',0
@@ -201,3 +234,4 @@ sockaddr_in resb 16
 sport       resb 2
 ; data buffer
 buff        resb 1024
+inp_buf resb 256
