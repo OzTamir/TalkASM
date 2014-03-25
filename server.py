@@ -13,7 +13,8 @@ def server():
 def client():
 	client = socket.socket()
 	client.connect(('127.0.0.1',43775))
-	client.send('hey\nThere\n')
+	while True:
+		client.send('EXIT\n')
 	client.close()
 
 if __name__ == '__main__':

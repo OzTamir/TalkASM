@@ -34,6 +34,16 @@ global _start
 section .text
 
 _start:
+	;; Get the CLI arguments into ebx
+	;pop ebx
+	;; The first argument is our program's name - and we don't care about it.
+	;dec ebx
+	;; Now let's get a port number from the CLI!
+	;pop ebx
+	;mov esi, ebx
+	;mov ecx, [length]
+	;call string_to_int
+	;mov [port], eax
 	xor eax, eax
 	
 socket:
@@ -57,11 +67,10 @@ socket:
 	int 0x80
 	; We store the socket's file descriptor in ESI for later
 	mov esi, eax
-	jmp short get_port
 
 run_server:
-	; get_port pushed the port number to the stack, so now we'll put it in edi
-	pop edi
+	; Get the port number specified
+	mov edi, port
 
 bind:
 	; Docstring: Bind the socket we've created to the IP and port we'll supply.
@@ -137,16 +146,22 @@ recv:
 	; Socketcall subcall: Recv (10)
 	; The C syntax for this label is:
 	; ssize_t recv(int s, void *buf, size_t len, int flags);
-	; sockfd - still in good ol' ESI, addr is set to NULL since we don't care who the client is, addrlen is ignored since addr is NULL.
+	; sockfd - is now the client's and it's int EAX, buf - data buffer to read into, size_t - how much to read, flags - nothing (0)
 	; ----
 	;
+	; Move the socket fd (of the client) to edx
 	mov edx, eax
 	mov eax, SYS_socketcall
 	mov ebx, SYS_RECV
+	; push the flags (nothing in our case)
 	push 0
-	push 100
+	; push the length of data to read from socket
+	push 10
+	; push the data buffer to read into
 	push buffer
+	; push the client's socket fd
 	push edx
+	; Move the pointer to recv() args into ECX and make the API call
 	mov ecx, esp
 	int 0x80
 
@@ -157,7 +172,7 @@ print:
 	mov ecx, buffer
 	mov ebx, stdout
 	mov eax, SYS_WRITE
-	int 0x80   
+	int 0x80
 
 exit:
   ; Docstring: Finish the run and return control to the OS
@@ -167,12 +182,23 @@ exit:
   push eax
   int 0x80
 
-get_port:
-	call run_server
-	db 0xaa, 0xff		; BYTE (43775 in straight hex)
-
+;string_to_int:
+  ;xor ebx,ebx    ; clear ebx
+;.next_digit:
+  ;movzx eax,byte[esi]
+  ;inc esi
+  ;sub al,'0'    ; convert from ASCII to number
+  ;imul ebx,10
+  ;add ebx,eax   ; ebx = ebx*10 + eax
+  ;loop .next_digit  ; while (--ecx)
+  ;mov eax,ebx
+  ;ret
+  
 section .data
+	port	db 0xaa, 0xff		; BYTE (43775 in straight hex)
+	exitCode db 'EXIT', 10
+	;length db 4
 
 section .bss
-
-buffer resb 254
+	buffer resb 254
+	;port resb 5

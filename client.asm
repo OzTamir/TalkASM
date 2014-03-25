@@ -222,7 +222,7 @@ prompt          db 'Enter your message:',0xa
 promptlen       equ $-prompt
  
 szIp         db '127.0.0.1',0
-szPort       db '1728',0
+szPort       db '43775',0
  
 section .bss
 ; Allocate uninitialized memory the socket we're going to create
