@@ -41,8 +41,8 @@ socket:
 	; The C syntax for this label is:
 	; int socket(int domain, int type, int protocol);
 	; domain = 6(IPPROTO_TCP), type = 1(SOCK_STREAM), protocol = 2(AF_INET)
-	;
 	; ----
+	;
 	mov al, SYS_socketcall
 	mov ebx, SYS_SOCKET
 	; socket() args pushed to the stack (LIFO order):
@@ -68,9 +68,9 @@ bind:
 	; Socketcall subcall: Bind (2)
 	; The C syntax for this label is:
 	; int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-	; (sockfd - stored in esi, sockaddr - {2 - AF_INET, 43775 - Port Number, 0 - host addr (0.0.0.0 means ANY host)},
-	;																					16 - length of an IPv4 addr)
+	; (sockfd - stored in esi, sockaddr - {2 - AF_INET, 43775 - Port Number, 0 - host addr (0.0.0.0 means ANY host)},																			16 - length of an IPv4 addr)
 	; ----
+	;
 	mov eax, SYS_socketcall
 	mov ebx, SYS_BIND
 	; -- Here we are building the sockaddr struct --
@@ -100,6 +100,7 @@ listen:
 	; int listen(int s, int backlog);  
 	; s - the socket fd, backlog - the number of queue allowed
 	; ----
+	;
 	mov BYTE al, SYS_socketcall
 	mov ebx, SYS_LISTEN
 	; The size of the queue allowed
@@ -110,13 +111,24 @@ listen:
 	mov ecx, esp
 	int 0x80
 
-
-	mov BYTE al, 102	; socketcall
-	inc ebx			; 5 = SYS_ACCEPT = accept()
-	push edx		; 	socklen_t *addrlen = 0);
-	push edx		; 	struct sockaddr *addr = NULL,
-	push esi		; listen(int sockfd,
-	mov ecx, esp		; ECX = PTR to arguments for accept()
+accept:
+	; Docstring: Accept an incoming connection
+	; Socketcall subcall: Accept (5)
+	; The C syntax for this label is:
+	; int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+	; sockfd - still in good ol' ESI, addr is set to NULL since we don't care who the client is, addrlen is ignored since addr is NULL.
+	; ----
+	;
+	mov BYTE al, SYS_socketcall
+	mov ebx, SYS_ACCEPT
+	; push addrlen (0)
+	push edx
+	; push addr (0 - NULL)
+	push edx
+	; push sockfd
+	push esi
+	; Move the pointer to accept() args into ECX and make the API call
+	mov ecx, esp
 	int 0x80
 
 

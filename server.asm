@@ -1,18 +1,20 @@
-;using sockets on linux with the 0x80 inturrprets.
+; Remote shell - this code will setup a localhost server and will spawn a shell for
+; 				 the connected socket
+; Written by Oz Tamir with insparation from @arno01
+;----------------
+; Global note:
+; The syntax for making a socketcall in C is:
+; int socketcall(int call, unsigned long *args);
 ;
-;assemble
-;  nasm -o socket.o -f elf32 -g socket.asm
-;link
-;  ld -o socket socket.o
-;
-; My Version:
-;		nasm -o socket.o -f elf32 -g client.asm 
-;		ld -m elf_i386 socket.o -o client
+; Therefor, any socketcall will be carried out as described here:
+; EAX - 102, the socketcall API number.
+; EBX - The call we would like to preform (socket, bind, send and so on)
+; ECX - The args for the specific call
+; 
+; This is the general syntax for socketcalls in this code, and to prevent redundency I will only
+; explain the specific subcall when one is being made.
+;----------------
 
-;
-
-;Just some assigns for better readability
- 
 %assign SOCK_STREAM         1
 %assign AF_INET             2
 %assign SYS_socketcall      102
@@ -27,251 +29,150 @@
 %assign SYS_WRITE           4
 %assign stdout           	1
 %assign stdin				0
- 
+
+global _start
 section .text
-  global _start
- 
-;--------------------------------------------------
-;Functions to make things easier.
-;--------------------------------------------------
-_socket:
-  ; Docstring: Create a Socket from the data found in cArray and return the socket's file descriptor
-  ; ----
-  ;Our socket's address's family - Internet Protocol, in this case
-  mov [cArray + 0], dword AF_INET
-  ; Stream protocol - TCP Here
-  mov [cArray + 4], dword SOCK_STREAM
-  mov [cArray + 8], dword 0
-  ; Call the socket API
-  mov eax, SYS_socketcall
-  mov ebx, SYS_SOCKET
-  mov ecx, cArray
-  int 0x80
-  ret
 
-_bind:
-  ; Docstring: Bind the server to a certin port
-  ; ----
-  ; Get a socket
-  call _socket
-  ; Move the socket fd recived into sock
-  mov dword [sock], eax
-  ; Get the pointer to the socket address (sockaddr) from the source register (SI)
-  mov dx, si
-  mov byte [edi + 3], dl
-  mov byte [edi + 2], dh
-  ; We are now calling connect, which takes three arguments: socket fd, pointer to sockaddr and the length of sockaddr.
-  ; We will store those arguments in a 'array' and then call the interrupt:
-  ; sockfd
-  mov [cArray + 0], eax
-  ; &sockaddr_in
-  mov [cArray + 4], edi
-  ; 16 is the length for IPv4. This is equal to sizeof(sockaddr_in) in C
-  mov edx, 16
-  mov [cArray + 8], edx
-  ; Call the connect interrupt with the data we provided.
-  mov eax, SYS_socketcall
-  mov ebx, SYS_BIND
-  mov ecx, cArray
-  int 0x80
-  ret
-  
-_listen:
-  ; Docstring: Listen and accept incoming connections
-  ; ----
-;  call _bind
-  ; Push the listen() parameters into stack - queue length and then socket fd
-  mov eax, [sock]
-  mov [lArray + 0], eax
-  mov [lArray + 4], dword 20
-  mov		eax, SYS_socketcall
-  mov		ebx, SYS_LISTEN
-  mov		ecx, lArray
-  int		0x80
-  ret
-  
- _accept:
-  ; Docstring: Listen and accept incoming connections
-  ; ----
-  call _listen
-  cmp eax, 0
-  jnz _fail
-  mov eax, [sock]
-  mov dx, si
-  mov byte [edi + 3], dl
-  mov byte [edi + 2], dh
-  
-  mov [sArray + 0], eax
-  ; sockaddr
-  mov [sArray + 4], edi
-  ; length of the buffer
-  mov [sArray + 8], dword 16
+_start:
+	xor eax, eax
+	
+socket:
+	; Docstring: Create a socket file descriptor
+	; The C syntax for this label is:
+	; int socket(int domain, int type, int protocol);
+	; domain = 6(IPPROTO_TCP), type = 1(SOCK_STREAM), protocol = 2(AF_INET)
+	; ----
+	;
+	mov al, SYS_socketcall
+	mov ebx, SYS_SOCKET
+	; socket() args pushed to the stack (LIFO order):
+	;	6 -> IPPROTO_TCP (TCP Protocol)
+	;	1 -> SOCK_STREAM (Socket protocol to support the TCP)
+	;	2 -> AF_INET (We tell the system API that we want socket from the internet address family, IPv4 as example)
+	push BYTE 6
+	push BYTE 1
+	push BYTE 2
+	; Now we put the pointer to the socket() args we just pushed into ECX
+	mov ecx, esp
+	int 0x80
+	; We store the socket's file descriptor in ESI for later
+	mov esi, eax
+	jmp short get_port
 
-  mov		eax, SYS_socketcall
-  mov		ebx, SYS_ACCEPT
-  mov		ecx, esp
-  int		0x80
-  ret
+run_server:
+	; get_port pushed the port number to the stack, so now we'll put it in edi
+	pop edi
 
-_recv:
-  call _accept
-  ;mov [sArray + 0], eax
-  ; data buffer (the data we're sending)
-  ;mov [sArray + 4], ecx
-  ; length of the buffer
-  ;mov [sArray + 8], edx
-  ; we don't want any flags...
-  ;mov [sArray + 12], dword 0
-  mov		eax, SYS_READ
-  mov		ebx, [sock]
-  lea ecx, [msg]
-  mov edx,  256
-  int		0x80
-  ret
- 
-_exit:
+bind:
+	; Docstring: Bind the socket we've created to the IP and port we'll supply.
+	; Socketcall subcall: Bind (2)
+	; The C syntax for this label is:
+	; int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+	; (sockfd - stored in esi, sockaddr - {2 - AF_INET, 43775 - Port Number, 0 - host addr (0.0.0.0 means ANY host)},																			16 - length of an IPv4 addr)
+	; ----
+	;
+	mov eax, SYS_socketcall
+	mov ebx, SYS_BIND
+	; -- Here we are building the sockaddr struct --
+	; Push 0.0.0.0 as host address
+	xor edx, edx
+	push edx
+	; Push the port number
+	push WORD [edi]
+	; Push the address family, 2, using the fact that it's also the current socketcall call number. Neat, right?
+	push WORD bx
+	; -- Store the struct in ECX and push the remaining args.
+	mov ecx, esp
+	; push addrlen
+	push BYTE 16
+	; push sockaddr
+	push ecx
+	; Finnaly, push the socket fd from ESI
+	push esi
+	; Move the pointer to bind() args into ECX and make the API call
+	mov ecx, esp
+	int 0x80
+
+listen:
+	; Docstring: Set listening mode and wait for incoming connections
+	; Socketcall subcall: Listen (4)
+	; The C syntax for this label is:
+	; int listen(int s, int backlog);  
+	; s - the socket fd, backlog - the number of queue allowed
+	; ----
+	;
+	mov BYTE al, SYS_socketcall
+	mov ebx, SYS_LISTEN
+	; The size of the queue allowed
+	push BYTE 1
+	; The socket fd
+	push esi
+	; Move the pointer to listen() args into ECX and make the API call
+	mov ecx, esp
+	int 0x80
+
+accept:
+	; Docstring: Accept an incoming connection
+	; Socketcall subcall: Accept (5)
+	; The C syntax for this label is:
+	; int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+	; sockfd - still in good ol' ESI, addr is set to NULL since we don't care who the client is, addrlen is ignored since addr is NULL.
+	; ----
+	;
+	mov BYTE al, SYS_socketcall
+	mov ebx, SYS_ACCEPT
+	; push addrlen (0)
+	push edx
+	; push addr (0 - NULL)
+	push edx
+	; push sockfd
+	push esi
+	; Move the pointer to accept() args into ECX and make the API call
+	mov ecx, esp
+	int 0x80
+
+
+recv:
+	; Docstring: Accept an incoming connection
+	; Socketcall subcall: Recv (10)
+	; The C syntax for this label is:
+	; ssize_t recv(int s, void *buf, size_t len, int flags);
+	; sockfd - still in good ol' ESI, addr is set to NULL since we don't care who the client is, addrlen is ignored since addr is NULL.
+	; ----
+	;
+	mov edx, eax
+	mov eax, SYS_socketcall
+	mov ebx, SYS_RECV
+	push 0
+	push 100
+	push buffer
+	push edx
+	mov ecx, esp
+	int 0x80
+
+print:
+	; Docstring: Print the string in edx (length stored in ecx)
+	; ----
+	mov edx, eax
+	mov ecx, buffer
+	mov ebx, stdout
+	mov eax, SYS_WRITE
+	int 0x80   
+
+exit:
   ; Docstring: Finish the run and return control to the OS
   ; ----
   push 0x1
   mov eax, 1
   push eax
   int 0x80
- 
-_print:
-  ; Docstring: Print the string in edx (length stored in ecx)
-  ; ----
-  mov ebx, stdout
-  mov eax, SYS_WRITE
-  int 0x80   
-  ret         
 
-;--------------------------------------------------
-;Main code body
-;--------------------------------------------------
- 
-_start:
-  ; Move the socket IP string to SI
-  mov esi, szIp
-  ; Move the uninitialized sockaddr_in to edi
-  mov edi, sockaddr_in
-  ; Clear EAX, ECX, EDX
-  xor eax,eax
-  xor ecx,ecx
-  xor edx,edx
-  ; Initialize sockaddr_in
-  .cc:
-    xor   ebx,ebx
-  .c:
-    lodsb
-    inc   edx
-    sub   al,'0'
-    jb   .next
-    imul ebx,byte 10
-    add   ebx,eax
-    jmp   short .c
-  .next:
-    mov   [edi + ecx + 4],bl
-    inc   ecx
-    cmp   ecx,byte 4
-    jne   .cc
-  ; Move the desired address family to edi
-  mov word [edi], AF_INET
-  ; Move the port string to esi
-  mov esi, szPort 
-  xor eax,eax
-  xor ebx,ebx
-  ; Initialize sport
-  .nextstr1:   
-    lodsb      
-    test al,al
-    jz .ret1
-    sub   al,'0'
-    imul ebx,10
-    add   ebx,eax   
-    jmp   .nextstr1
-  .ret1:
-    xchg ebx,eax   
-    mov [sport], eax
- ; Move the socket port to si
-  ; Create and connect to the socket
-  call _bind
-  ; If the connection failed for some reason, it'll return an error code (err != 0)
-  cmp eax, 0
-  ; If we had en error, call fail() to log it
-  jnz short _fail
-  ; Move the message we want to send to eax (and it's length to ecx)
-  jmp _readInput
-
-
-_readInput:
-  ; Docstring: Read an input from the user and send it over the socket
-  ; ----
-  ; Prompt the user for input
-  ;mov  ecx,prompt
-  ;mov  edx,promptlen	
-  ;call _print
-  mov si, [sport]
-  call _recv
-  mov edx,eax
-  call _print
-  ; Thats it for today.
-  call _exit
-
-
-_fail:
-  ; In case something wen't wrong, print an error msg and quit.
-  mov edx, cerrlen
-  mov ecx, cerrmsg
-  call _print
-  call _exit
-
-
-_recverr: 
-  call _exit
-
-
-_dced: 
-  call _exit
-
+get_port:
+	call run_server
+	db 0xaa, 0xff		; BYTE (43775 in straight hex)
 
 section .data
-; The error messsage if we couldn't connect
-cerrmsg      db 'failed to connect :(',0xa
-cerrlen      equ $-cerrmsg
-; The prompt text for getting input from the user
-prompt          db 'Enter your message:',0xa
-promptlen       equ $-prompt
- 
-szIp         db '127.0.0.1',0
-szPort       db '1728',0
- 
+
 section .bss
-; Allocate uninitialized memory the socket we're going to create
-sock         resd 1
 
-lArray        resd 1
-			  resd 1
-; I'm using cArray as a general 'array' for syscall_socketcall argument arg.
-cArray       resd 1
-             resd 1
-             resd 1
-             resd 1
- 
-; 'array' of things to send
-sArray      resd 1
-            resd 1
-            resd 1
-            resd 1
-
-; sockaddr_in is a C struct used by the sockets API to store information about the socket (Address family, port and address)
-sockaddr_in resb 16
-
-socket_address resd 1
-
-; socket port
-sport       resb 2
-; data buffer
-buff        resb 1024
-
-; The buffer to hold the user's data
-msg resb 256
+buffer resb 254
