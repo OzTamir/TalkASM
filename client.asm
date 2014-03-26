@@ -186,6 +186,8 @@ _readInput:
   mov edx, 256
   int 80h
   ; Push the return value (the input length) to stack
+  cmp eax, 0
+  jz _exit
   push eax
   ; Move the input itself to eax
   mov eax, msg
@@ -194,7 +196,7 @@ _readInput:
   ; Send the message over the socket
   call _send
   ; Thats it for today.
-  call _exit
+  jmp _readInput
 
 
 _fail:

@@ -113,7 +113,7 @@ listen:
 	mov BYTE al, SYS_socketcall
 	mov ebx, SYS_LISTEN
 	; The size of the queue allowed
-	push BYTE 1
+	push BYTE 10
 	; The socket fd
 	push esi
 	; Move the pointer to listen() args into ECX and make the API call
@@ -139,24 +139,24 @@ accept:
 	; Move the pointer to accept() args into ECX and make the API call
 	mov ecx, esp
 	int 0x80
-
+	mov [sock], eax
 
 recv:
 	; Docstring: Accept an incoming connection
 	; Socketcall subcall: Recv (10)
 	; The C syntax for this label is:
 	; ssize_t recv(int s, void *buf, size_t len, int flags);
-	; sockfd - is now the client's and it's int EAX, buf - data buffer to read into, size_t - how much to read, flags - nothing (0)
+	; s - is the client's socket fd and it's int EAX, buf - data buffer to read into, size_t - how much to read, flags - nothing (0)
 	; ----
 	;
 	; Move the socket fd (of the client) to edx
-	mov edx, eax
+	mov edx, [sock]
 	mov eax, SYS_socketcall
 	mov ebx, SYS_RECV
 	; push the flags (nothing in our case)
 	push 0
 	; push the length of data to read from socket
-	push 10
+	push 253
 	; push the data buffer to read into
 	push buffer
 	; push the client's socket fd
@@ -164,15 +164,20 @@ recv:
 	; Move the pointer to recv() args into ECX and make the API call
 	mov ecx, esp
 	int 0x80
+	cmp eax, -1
+	jz exit
+	call print
+	jmp recv
 
 print:
-	; Docstring: Print the string in edx (length stored in ecx)
+	; Docstring: Print the string in ecx (length stored in edx)
 	; ----
 	mov edx, eax
 	mov ecx, buffer
 	mov ebx, stdout
 	mov eax, SYS_WRITE
 	int 0x80
+	ret
 
 exit:
   ; Docstring: Finish the run and return control to the OS
@@ -181,18 +186,6 @@ exit:
   mov eax, 1
   push eax
   int 0x80
-
-;string_to_int:
-  ;xor ebx,ebx    ; clear ebx
-;.next_digit:
-  ;movzx eax,byte[esi]
-  ;inc esi
-  ;sub al,'0'    ; convert from ASCII to number
-  ;imul ebx,10
-  ;add ebx,eax   ; ebx = ebx*10 + eax
-  ;loop .next_digit  ; while (--ecx)
-  ;mov eax,ebx
-  ;ret
   
 section .data
 	port	db 0xaa, 0xff		; BYTE (43775 in straight hex)
@@ -200,5 +193,6 @@ section .data
 	;length db 4
 
 section .bss
+	sock resd 1
 	buffer resb 254
 	;port resb 5
