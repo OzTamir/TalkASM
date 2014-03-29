@@ -14,7 +14,7 @@
 ; This is the general syntax for socketcalls in this code, and to prevent redundency I will only
 ; explain the specific subcall when one is being made.
 ;----------------
-
+%assign SYS_FORK			2
 %assign SOCK_STREAM         1
 %assign AF_INET             2
 %assign SYS_socketcall      102
@@ -67,6 +67,7 @@ socket:
 	int 0x80
 	; We store the socket's file descriptor in ESI for later
 	mov esi, eax
+	mov [sock], eax
 
 run_server:
 	; Get the port number specified
@@ -141,6 +142,12 @@ accept:
 	int 0x80
 	mov [sock], eax
 
+fork:
+	mov eax, SYS_FORK
+	int 0x80
+	cmp eax, 0
+	jz readInput
+
 recv:
 	; Docstring: Accept an incoming connection
 	; Socketcall subcall: Recv (10)
@@ -166,14 +173,48 @@ recv:
 	int 0x80
 	cmp eax, -1
 	jz exit
+	cmp eax, 0
+	jz recv
+	mov edx, eax
+	mov ecx, buffer
 	call print
 	jmp recv
+
+readInput:
+	mov edx, promptlen
+	mov ecx, prompt
+	call print
+	mov ecx, out_buff
+	mov edx, 256
+	call readText
+	push eax
+	mov eax, out_buff
+	pop ecx
+	call send
+	jmp readInput
+
+readText:
+	mov eax, SYS_READ
+	mov ebx, stdin
+	int 0x80
+	ret
+
+send:
+	; buffer length in eax
+	; ssize_t send(int s, const void *buf, size_t len, int flags); 
+	push dword 0
+	push ecx
+	push eax
+	push dword [sock]
+	mov ecx, esp
+	mov eax, SYS_socketcall
+	mov ebx, SYS_SEND
+	int 0x80
+	ret
 
 print:
 	; Docstring: Print the string in ecx (length stored in edx)
 	; ----
-	mov edx, eax
-	mov ecx, buffer
 	mov ebx, stdout
 	mov eax, SYS_WRITE
 	int 0x80
@@ -189,10 +230,15 @@ exit:
   
 section .data
 	port	db 0xaa, 0xff		; BYTE (43775 in straight hex)
-	exitCode db 'EXIT', 10
+	exitCode db 'EXIT', 0xa 
+	prompt db '>> '
+	promptlen equ $-prompt
 	;length db 4
 
 section .bss
 	sock resd 1
 	buffer resb 254
+	out_buff resb 1024
+	out_buff_len equ $-out_buff
+	eof_buff resb 1
 	;port resb 5

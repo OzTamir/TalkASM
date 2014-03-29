@@ -12,7 +12,8 @@
 ;
 
 ;Just some assigns for better readability
- 
+
+%assign SYS_FORK			2
 %assign SOCK_STREAM         1
 %assign AF_INET             2
 %assign SYS_socketcall      102
@@ -73,7 +74,7 @@ _connect:
   int 0x80
   ret
  
-_send:
+send:
   ; Docstring: send a message across a socket
   ; ----
   ; Get the socket into a register...
@@ -94,7 +95,7 @@ _send:
   int 0x80
   ret
  
-_exit:
+exit:
   ; Docstring: Finish the run and return control to the OS
   ; ----
   push 0x1
@@ -102,7 +103,7 @@ _exit:
   push eax
   int 0x80
  
-_print:
+print:
   ; Docstring: Print the string in edx (length stored in ecx)
   ; ----
   mov ebx, stdout
@@ -164,55 +165,90 @@ _start:
   ; If the connection failed for some reason, it'll return an error code (err != 0)
   cmp eax, 0
   ; If we had en error, call fail() to log it
-  jnz short _fail
+  jnz fail
   ; Move the message we want to send to eax (and it's length to ecx)
-  jmp _readInput
 
+fork:
+	mov eax, SYS_FORK
+	int 0x80
+	cmp eax, 0
+	jz recv
 
-_readInput:
+readInput:
   ; Docstring: Read an input from the user and send it over the socket
   ; ----
   ; Prompt the user for input
-  mov  ecx,prompt
-  mov  edx,promptlen	
-  call _print
-  
-  ; Read the user response and store it in
-  mov  eax,SYS_READ
-  mov  ebx,stdin
+  mov ecx,prompt
+  mov edx,promptlen	
+  call print
   ; Buffer to save input in
   mov  ecx, msg
   ; Number of bytes to read
   mov edx, 256
-  int 80h
+  call readText
   ; Push the return value (the input length) to stack
-  cmp eax, 0
-  jz _exit
   push eax
   ; Move the input itself to eax
   mov eax, msg
   ; Pop the msg length into ecx
   pop ecx
   ; Send the message over the socket
-  call _send
+  call send
   ; Thats it for today.
-  jmp _readInput
+  jmp readInput
+  
+readText:
+	mov eax, SYS_READ
+	mov ebx, stdin
+	int 0x80
+	ret
 
-
-_fail:
+recv:
+	; Docstring: Accept an incoming connection
+	; Socketcall subcall: Recv (10)
+	; The C syntax for this label is:
+	; ssize_t recv(int s, void *buf, size_t len, int flags);
+	; s - is the client's socket fd and it's int EAX, buf - data buffer to read into, size_t - how much to read, flags - nothing (0)
+	; ----
+	;
+	; Move the socket fd (of the client) to edx
+	mov edx, [sock]
+	mov eax, SYS_socketcall
+	mov ebx, SYS_RECV
+	; push the flags (nothing in our case)
+	push 0
+	; push the length of data to read from socket
+	push 253
+	; push the data buffer to read into
+	push buffer
+	; push the client's socket fd
+	push edx
+	; Move the pointer to recv() args into ECX and make the API call
+	mov ecx, esp
+	int 0x80
+	cmp eax, -1
+	jz fail
+	cmp eax, 0
+	jz recv
+	mov edx, eax
+	mov ecx, buffer
+	call print
+	jmp recv
+	
+fail:
   ; In case something wen't wrong, print an error msg and quit.
   mov edx, cerrlen
   mov ecx, cerrmsg
-  call _print
-  call _exit
+  call print
+  call exit
 
 
 _recverr: 
-  call _exit
+  call exit
 
 
 _dced: 
-  call _exit
+  call exit
 
 
 section .data
@@ -220,7 +256,7 @@ section .data
 cerrmsg      db 'failed to connect :(',0xa
 cerrlen      equ $-cerrmsg
 ; The prompt text for getting input from the user
-prompt          db 'Enter your message:',0xa
+prompt          db '>> '
 promptlen       equ $-prompt
  
 szIp         db '127.0.0.1',0
@@ -249,6 +285,7 @@ sockaddr_in resb 16
 sport       resb 2
 ; data buffer
 buff        resb 1024
+buffer resb 254
 
 ; The buffer to hold the user's data
 msg resb 256
