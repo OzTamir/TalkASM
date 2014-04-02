@@ -34,16 +34,6 @@ global _start
 section .text
 
 _start:
-	;; Get the CLI arguments into ebx
-	;pop ebx
-	;; The first argument is our program's name - and we don't care about it.
-	;dec ebx
-	;; Now let's get a port number from the CLI!
-	;pop ebx
-	;mov esi, ebx
-	;mov ecx, [length]
-	;call string_to_int
-	;mov [port], eax
 	xor eax, eax
 	
 socket:
