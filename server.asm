@@ -143,8 +143,11 @@ accept:
 	mov [sock], eax
 
 fork:
+	; Docstring: Fork the process to emulate multithreading
+	; ----
 	mov eax, SYS_FORK
 	int 0x80
+	; If the return value is 0, we are in the child process
 	cmp eax, 0
 	jz readInput
 
@@ -181,35 +184,52 @@ recv:
 	jmp recv
 
 readInput:
+	; Docstring: Recive an input from the user and send it
+	; ----
+	; Print the prompt (">> ")
 	mov edx, promptlen
 	mov ecx, prompt
 	call print
+	; Read input
 	mov ecx, out_buff
 	mov edx, 256
 	call readText
+	; Move the input to eax and the length to ecx
 	push eax
 	mov eax, out_buff
 	pop ecx
+	; Move the socket's fd to edx
 	mov edx, [sock]
+	; Send it!
 	jmp send
 
 readText:
+	; Docstring: A small subroutine to read input
 	mov eax, SYS_READ
 	mov ebx, stdin
 	int 0x80
 	ret
 
 send:
-	; buffer in eax
-	; ssize_t send(int s, const void *buf, size_t len, int flags); 
+	; Docstring: Send the buffer stored in eax over the socket
+	; C-syntax: ssize_t send(int s, const void *buf, size_t len, int flags);
+	; ----
+	;
+	; Push the flags (none)
 	push dword 0
+	; Push the length (we stored it in ecx on 'readInput'
 	push ecx
+	; Push the data itself
 	push eax
+	; Push the socket's fd
 	push edx
+	; Move the arguments to ecx
 	mov ecx, esp
+	; Make the system call
 	mov eax, SYS_socketcall
 	mov ebx, SYS_SEND
 	int 0x80
+	; Jump to read new input in an infinite loop
 	jmp readInput
 
 print:
@@ -221,7 +241,7 @@ print:
 	ret
 
 printOther:
-	; Docstring: Print the string in ecx (length stored in edx)
+	; Docstring: Print the data recived from the socket (preceded by "Recived: " label)
 	; ----
 	; Push the recived message and it's length to the stack
 	push edx
@@ -237,7 +257,7 @@ printOther:
 	pop edx
 	mov eax, SYS_WRITE
 	int 0x80
-	; Return for the normal input
+	; Return the prompt of the normal input
 	mov ecx, prompt
 	mov edx, promptlen
 	mov eax, SYS_WRITE
@@ -253,16 +273,17 @@ exit:
   int 0x80
   
 section .data
-	port	db 0xaa, 0xff		; BYTE (43775 in straight hex)
+	; Our port number in hex format
+	port	db 0xaa, 0xff
+	; Output prompts
 	otherPrompt db 0xa, 'Recived: '
 	otherlen equ $-otherPrompt
 	prompt db '>> '
 	promptlen equ $-prompt
 
 section .bss
+	; The socket's file descriptor
 	sock resd 1
+	; The input and output buffers
 	buffer resb 254
 	out_buff resb 256
-	out_buff_len equ $-out_buff
-	eof_buff resb 1
-	;port resb 5

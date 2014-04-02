@@ -167,7 +167,7 @@ _start:
   ; If we had en error, call fail() to log it
   jnz fail
   ; Move the message we want to send to eax (and it's length to ecx)
-
+	
 fork:
 	mov eax, SYS_FORK
 	int 0x80
