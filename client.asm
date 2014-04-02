@@ -232,9 +232,33 @@ recv:
 	;jz recv
 	mov edx, eax
 	mov ecx, buffer
-	call print
+	call printOther
 	jmp recv
-	
+
+printOther:
+	; Docstring: Print the string in ecx (length stored in edx)
+	; ----
+	; Push the recived message and it's length to the stack
+	push edx
+	push ecx
+	; Print the "Recived" label
+	mov edx, otherlen
+	mov ecx, otherPrompt
+	mov ebx, stdout
+	mov eax, SYS_WRITE
+	int 0x80
+	; Print the actual message
+	pop ecx
+	pop edx
+	mov eax, SYS_WRITE
+	int 0x80
+	; Return for the normal input
+	mov ecx, prompt
+	mov edx, promptlen
+	mov eax, SYS_WRITE
+	int 0x80
+	ret
+
 fail:
   ; In case something wen't wrong, print an error msg and quit.
   mov edx, cerrlen
@@ -258,6 +282,8 @@ cerrlen      equ $-cerrmsg
 ; The prompt text for getting input from the user
 prompt          db '>> '
 promptlen       equ $-prompt
+otherPrompt db 0xa, 'Recived: '
+otherlen equ $-otherPrompt
  
 szIp         db '127.0.0.1',0
 szPort       db '43775',0

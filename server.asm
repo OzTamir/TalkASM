@@ -177,7 +177,7 @@ recv:
 	jz recv
 	mov edx, eax
 	mov ecx, buffer
-	call print
+	call printOther
 	jmp recv
 
 readInput:
@@ -220,6 +220,30 @@ print:
 	int 0x80
 	ret
 
+printOther:
+	; Docstring: Print the string in ecx (length stored in edx)
+	; ----
+	; Push the recived message and it's length to the stack
+	push edx
+	push ecx
+	; Print the "Recived" label
+	mov edx, otherlen
+	mov ecx, otherPrompt
+	mov ebx, stdout
+	mov eax, SYS_WRITE
+	int 0x80
+	; Print the actual message
+	pop ecx
+	pop edx
+	mov eax, SYS_WRITE
+	int 0x80
+	; Return for the normal input
+	mov ecx, prompt
+	mov edx, promptlen
+	mov eax, SYS_WRITE
+	int 0x80
+	ret
+
 exit:
   ; Docstring: Finish the run and return control to the OS
   ; ----
@@ -230,10 +254,10 @@ exit:
   
 section .data
 	port	db 0xaa, 0xff		; BYTE (43775 in straight hex)
-	exitCode db 'EXIT', 0xa 
+	otherPrompt db 0xa, 'Recived: '
+	otherlen equ $-otherPrompt
 	prompt db '>> '
 	promptlen equ $-prompt
-	;length db 4
 
 section .bss
 	sock resd 1
