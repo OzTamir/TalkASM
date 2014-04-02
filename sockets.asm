@@ -46,6 +46,32 @@ userInput:
 	pop ecx
 	ret
 
+send:
+	; Docstring: Send the buffer stored in eax over the socket
+	; C-syntax: ssize_t send(int s, const void *buf, size_t len, int flags);
+	; ----
+	;
+	; Push the flags (none)
+	push dword 0
+	; Push the length (we stored it in ecx on 'readInput'
+	push ecx
+	; Push the data itself
+	push eax
+	; Push the socket's fd
+	push edx
+	; Move the arguments to ecx
+	mov ecx, esp
+	; Make the system call
+	mov eax, SYS_socketcall
+	mov ebx, SYS_SEND
+	int 0x80
+	; Jump to read new input in an infinite loop
+	pop ebp
+	pop ebp
+	pop ebp
+	pop ebp
+	ret
+
 ;--------------------------------------------------
 ; Server Functions:
 ;--------------------------------------------------

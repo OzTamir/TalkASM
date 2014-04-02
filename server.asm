@@ -121,9 +121,7 @@ recv:
 	; ----
 	;
 	; Move the socket fd (of the client) to edx
-	mov edx, [sock]
-	mov eax, SYS_socketcall
-	mov ebx, SYS_RECV
+	;mov edx, [sock]
 	; push the flags (nothing in our case)
 	push 0
 	; push the length of data to read from socket
@@ -131,9 +129,11 @@ recv:
 	; push the data buffer to read into
 	push buffer
 	; push the client's socket fd
-	push edx
+	push dword [sock]
 	; Move the pointer to recv() args into ECX and make the API call
 	mov ecx, esp
+	mov eax, SYS_socketcall
+	mov ebx, SYS_RECV
 	int 0x80
 	cmp eax, -1
 	jz exit
@@ -145,76 +145,17 @@ recv:
 	jmp recv
 
 readInput:
-	;~ ; Docstring: Recive an input from the user and send it
-	;~ ; ----
-	;~ ; Print the prompt (">> ")
-	;~ mov edx, promptlen
-	;~ mov ecx, prompt
-	;~ call print
-	;~ ; Read input
-	;~ mov ecx, out_buff
-	;~ mov edx, 256
-	;~ call readText
-	;~ ; Move the input to eax and the length to ecx
-	;~ push eax
-	;~ mov eax, out_buff
-	;~ pop ecx
 	call userInput
 	; Move the socket's fd to edx
 	mov edx, [sock]
 	; Send it!
-	jmp send
-
-send:
-	; Docstring: Send the buffer stored in eax over the socket
-	; C-syntax: ssize_t send(int s, const void *buf, size_t len, int flags);
-	; ----
-	;
-	; Push the flags (none)
-	push dword 0
-	; Push the length (we stored it in ecx on 'readInput'
-	push ecx
-	; Push the data itself
-	push eax
-	; Push the socket's fd
-	push edx
-	; Move the arguments to ecx
-	mov ecx, esp
-	; Make the system call
-	mov eax, SYS_socketcall
-	mov ebx, SYS_SEND
-	int 0x80
-	; Jump to read new input in an infinite loop
+	call send
 	jmp readInput
-
-printOther:
-	; Docstring: Print the data recived from the socket (preceded by "Recived: " label)
-	; ----
-	; Push the recived message and it's length to the stack
-	push edx
-	push ecx
-	; Print the "Recived" label
-	mov edx, otherlen
-	mov ecx, otherPrompt
-	mov ebx, stdout
-	mov eax, SYS_WRITE
-	int 0x80
-	; Print the actual message
-	pop ecx
-	pop edx
-	mov eax, SYS_WRITE
-	int 0x80
-	; Return the prompt of the normal input
-	mov ecx, prompt
-	mov edx, promptlen
-	mov eax, SYS_WRITE
-	int 0x80
-	ret
   
 section .data
 	%include "data.asm"
 	; Our port number in hex format
-	port	db 0xaa, 0xff
+	port	db 0xaa, 0xfe
 
 section .bss
 	; The socket's file descriptor

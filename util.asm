@@ -77,3 +77,27 @@ print:
 	mov eax, SYS_WRITE
 	int 0x80
 	ret
+
+printOther:
+	; Docstring: Print the data recived from the socket (preceded by "Recived: " label)
+	; ----
+	; Push the recived message and it's length to the stack
+	push edx
+	push ecx
+	; Print the "Recived" label
+	mov edx, otherlen
+	mov ecx, otherPrompt
+	mov ebx, stdout
+	mov eax, SYS_WRITE
+	int 0x80
+	; Print the actual message
+	pop ecx
+	pop edx
+	mov eax, SYS_WRITE
+	int 0x80
+	; Return the prompt of the normal input
+	mov ecx, prompt
+	mov edx, promptlen
+	mov eax, SYS_WRITE
+	int 0x80
+	ret
