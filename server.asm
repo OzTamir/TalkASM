@@ -14,47 +14,19 @@
 ; This is the general syntax for socketcalls in this code, and to prevent redundency I will only
 ; explain the specific subcall when one is being made.
 ;----------------
-%assign SYS_FORK			2
-%assign SOCK_STREAM         1
-%assign AF_INET             2
-%assign SYS_socketcall      102
-%assign SYS_SOCKET          1
-%assign SYS_BIND			2
-%assign SYS_CONNECT         3
-%assign SYS_LISTEN			4
-%assign SYS_ACCEPT			5
-%assign SYS_SEND            9
-%assign SYS_RECV            10
-%assign SYS_READ			3
-%assign SYS_WRITE           4
-%assign stdout           	1
-%assign stdin				0
-
 global _start
+%include "constants.asm"
+%include "util.asm"
+%include "sockets.asm"
+
 section .text
 
 _start:
 	xor eax, eax
 	
-socket:
-	; Docstring: Create a socket file descriptor
-	; The C syntax for this label is:
-	; int socket(int domain, int type, int protocol);
-	; domain = 6(IPPROTO_TCP), type = 1(SOCK_STREAM), protocol = 2(AF_INET)
-	; ----
-	;
-	mov al, SYS_socketcall
-	mov ebx, SYS_SOCKET
-	; socket() args pushed to the stack (LIFO order):
-	;	6 -> IPPROTO_TCP (TCP Protocol)
-	;	1 -> SOCK_STREAM (Socket protocol to support the TCP)
-	;	2 -> AF_INET (We tell the system API that we want socket from the internet address family, IPv4 as example)
-	push BYTE 6
-	push BYTE 1
-	push BYTE 2
-	; Now we put the pointer to the socket() args we just pushed into ECX
-	mov ecx, esp
-	int 0x80
+socke:
+	; Get the socket's fd in eax
+	call socket
 	; We store the socket's file descriptor in ESI for later
 	mov esi, eax
 	mov [sock], eax
@@ -70,7 +42,6 @@ bind:
 	; int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 	; (sockfd - stored in esi, sockaddr - {2 - AF_INET, 43775 - Port Number, 0 - host addr (0.0.0.0 means ANY host)},																			16 - length of an IPv4 addr)
 	; ----
-	;
 	mov eax, SYS_socketcall
 	mov ebx, SYS_BIND
 	; -- Here we are building the sockaddr struct --
@@ -174,31 +145,25 @@ recv:
 	jmp recv
 
 readInput:
-	; Docstring: Recive an input from the user and send it
-	; ----
-	; Print the prompt (">> ")
-	mov edx, promptlen
-	mov ecx, prompt
-	call print
-	; Read input
-	mov ecx, out_buff
-	mov edx, 256
-	call readText
-	; Move the input to eax and the length to ecx
-	push eax
-	mov eax, out_buff
-	pop ecx
+	;~ ; Docstring: Recive an input from the user and send it
+	;~ ; ----
+	;~ ; Print the prompt (">> ")
+	;~ mov edx, promptlen
+	;~ mov ecx, prompt
+	;~ call print
+	;~ ; Read input
+	;~ mov ecx, out_buff
+	;~ mov edx, 256
+	;~ call readText
+	;~ ; Move the input to eax and the length to ecx
+	;~ push eax
+	;~ mov eax, out_buff
+	;~ pop ecx
+	call userInput
 	; Move the socket's fd to edx
 	mov edx, [sock]
 	; Send it!
 	jmp send
-
-readText:
-	; Docstring: A small subroutine to read input
-	mov eax, SYS_READ
-	mov ebx, stdin
-	int 0x80
-	ret
 
 send:
 	; Docstring: Send the buffer stored in eax over the socket
@@ -221,14 +186,6 @@ send:
 	int 0x80
 	; Jump to read new input in an infinite loop
 	jmp readInput
-
-print:
-	; Docstring: Print the string in ecx (length stored in edx)
-	; ----
-	mov ebx, stdout
-	mov eax, SYS_WRITE
-	int 0x80
-	ret
 
 printOther:
 	; Docstring: Print the data recived from the socket (preceded by "Recived: " label)
@@ -253,23 +210,11 @@ printOther:
 	mov eax, SYS_WRITE
 	int 0x80
 	ret
-
-exit:
-  ; Docstring: Finish the run and return control to the OS
-  ; ----
-  push 0x1
-  mov eax, 1
-  push eax
-  int 0x80
   
 section .data
+	%include "data.asm"
 	; Our port number in hex format
 	port	db 0xaa, 0xff
-	; Output prompts
-	otherPrompt db 0xa, 'Recived: '
-	otherlen equ $-otherPrompt
-	prompt db '>> '
-	promptlen equ $-prompt
 
 section .bss
 	; The socket's file descriptor
