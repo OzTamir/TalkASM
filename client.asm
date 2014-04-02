@@ -226,10 +226,10 @@ recv:
 	mov eax, SYS_socketcall
 	mov ebx, SYS_RECV
 	int 0x80
-	;cmp eax, -1
-	;jz fail
-	;cmp eax, 0
-	;jz recv
+	cmp eax, -1
+	jz fail
+	cmp eax, 0
+	jz exit
 	mov edx, eax
 	mov ecx, buffer
 	call printOther
