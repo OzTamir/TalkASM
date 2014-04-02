@@ -212,9 +212,7 @@ recv:
 	; ----
 	;
 	; Move the socket fd (of the client) to edx
-	mov edx, [sock]
-	mov eax, SYS_socketcall
-	mov ebx, SYS_RECV
+	;mov edx, [sock]
 	; push the flags (nothing in our case)
 	push 0
 	; push the length of data to read from socket
@@ -222,14 +220,16 @@ recv:
 	; push the data buffer to read into
 	push buffer
 	; push the client's socket fd
-	push edx
+	push dword [sock]
 	; Move the pointer to recv() args into ECX and make the API call
 	mov ecx, esp
+	mov eax, SYS_socketcall
+	mov ebx, SYS_RECV
 	int 0x80
-	cmp eax, -1
-	jz fail
-	cmp eax, 0
-	jz recv
+	;cmp eax, -1
+	;jz fail
+	;cmp eax, 0
+	;jz recv
 	mov edx, eax
 	mov ecx, buffer
 	call print

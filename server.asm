@@ -190,8 +190,8 @@ readInput:
 	push eax
 	mov eax, out_buff
 	pop ecx
-	call send
-	jmp readInput
+	mov edx, [sock]
+	jmp send
 
 readText:
 	mov eax, SYS_READ
@@ -200,17 +200,17 @@ readText:
 	ret
 
 send:
-	; buffer length in eax
+	; buffer in eax
 	; ssize_t send(int s, const void *buf, size_t len, int flags); 
 	push dword 0
 	push ecx
 	push eax
-	push dword [sock]
+	push edx
 	mov ecx, esp
 	mov eax, SYS_socketcall
 	mov ebx, SYS_SEND
 	int 0x80
-	ret
+	jmp readInput
 
 print:
 	; Docstring: Print the string in ecx (length stored in edx)
@@ -238,7 +238,7 @@ section .data
 section .bss
 	sock resd 1
 	buffer resb 254
-	out_buff resb 1024
+	out_buff resb 256
 	out_buff_len equ $-out_buff
 	eof_buff resb 1
 	;port resb 5
