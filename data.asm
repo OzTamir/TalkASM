@@ -11,5 +11,7 @@ cerrlen      equ $-cerrmsg
 ; Usage errors
 clientUse      db 'ERROR!', 0xa, 'Usage: ./client <Server IP> <PORT>', 0xa
 c_usagelen      equ $-clientUse
-serverUse      db 'ERROR!', 0xa, 'Usage: ./server <PORT>', 0xa
-s_usagelen      equ $-serverUse
+
+; Port settings
+serverPort	db 0xaa, 0xfe
+clientPort db '43774',0

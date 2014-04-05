@@ -27,7 +27,7 @@ _start:
 	; Get the CLI arguments and parse it
 	pop ebx
 	; Verify that we got the expected number of arguments
-	cmp ebx, 3
+	cmp ebx, 2
 	jnz clientUsage
 	; Get the IP argument
 	pop ecx
@@ -36,8 +36,7 @@ _start:
 	mov edi, sockaddr_in
 	call initIP
 	; Get the Port argument
-	pop ecx
-	mov esi, ecx
+	mov esi, clientPort
 	call initPort
 	mov [port], eax
 

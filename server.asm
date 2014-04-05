@@ -22,16 +22,6 @@ global _start
 section .text
 
 _start:
-	; Get the CLI arguments
-	pop ebx
-	; Verify that we have the right number of arguments
-	cmp ebx, 2
-	jnz serverUsage
-	; Get the port argument
-	pop esi
-	;mov esi, ecx
-	call initPort
-	;mov [port], eax
 	xor eax, eax
 	
 socke:
@@ -43,7 +33,7 @@ socke:
 
 run_server:
 	; Get the port number specified
-	mov edi, port
+	mov edi, serverPort
 
 bind:
 	; Docstring: Bind the socket we've created to the IP and port we'll supply.
@@ -165,8 +155,6 @@ readInput:
   
 section .data
 	%include "data.asm"
-	; Our port number in hex format
-	port	db 0xaa, 0xfe
 
 section .bss
 	; The socket's file descriptor

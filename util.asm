@@ -77,12 +77,6 @@ clientUsage:
 	call print
 	call exit
 
-serverUsage:
-	mov ecx, serverUse
-	mov edx, s_usagelen
-	call print
-	call exit
-
 
 fail:
   ; In case something wen't wrong, print an error msg and quit.
