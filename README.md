@@ -1,5 +1,7 @@
-Chatsm - P2P Chat written in x86 NASM
+Chatsm - Simple Chat written in x86 NASM
 ============
+
+![Chatsm Preview](https://raw2.github.com/OzTamir/NASM-Sockets/master/static/img/demo.png)
 
 Two main files:
 ---
