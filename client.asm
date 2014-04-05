@@ -24,39 +24,48 @@ section .text
 ;--------------------------------------------------
  
 _start:
-  ; Move the socket IP string to SI
-  mov esi, szIp
-  mov edi, sockaddr_in
-  call initIP
-  ; Move the port string to esi
-  mov esi, szPort
-  call initPort
-  mov [sport], eax
- ; Move the socket port to si
-  mov si, [sport]
-  ; Create and connect to the socket
-  call socket
-  mov [sock], eax
-  call connect
-  ; If the connection failed for some reason, it'll return an error code (err != 0)
-  cmp eax, 0
-  ; If we had en error, call fail() to log it
-  jnz fail
-  ; Move the message we want to send to eax (and it's length to ecx)
+	; Get the CLI arguments and parse it
+	pop ebx
+	; Verify that we got the expected number of arguments
+	cmp ebx, 3
+	jnz clientUsage
+	; Get the IP argument
+	pop ecx
+	pop ecx
+	mov esi, ecx
+	mov edi, sockaddr_in
+	call initIP
+	; Get the Port argument
+	pop ecx
+	mov esi, ecx
+	call initPort
+	mov [port], eax
+
+start_client:
+	; Create and connect to the socket
+	call socket
+	mov [sock], eax
+	mov si, [port]
+	call connect
+	; If the connection failed for some reason, notify the user
+	cmp eax, 0
+	jnz fail
 	
 fork:
+	; Fork the two processes (Reading from the Terminal and reciving from the socket)
 	mov eax, SYS_FORK
 	int 0x80
 	cmp eax, 0
 	jz recv
 
 readInput:
-  call userInput
-  ; Send the message over the socket
-  mov edx, [sock]
-  call send
-  ; Thats it for today.
-  jmp readInput
+	; Get input from the user
+	call userInput
+	; Send the message over the socket
+	mov edx, [sock]
+	call send
+	; Thats it for today.
+	jmp readInput
 
 recv:
 	; Docstring: Accept an incoming connection
@@ -90,36 +99,17 @@ recv:
 	call printOther
 	jmp recv
 
-fail:
-  ; In case something wen't wrong, print an error msg and quit.
-  mov edx, cerrlen
-  mov ecx, cerrmsg
-  call print
-  call exit
-
-
 section .data
 	%include "data.asm"
-	; The error messsage if we couldn't connect
-	cerrmsg      db 'failed to connect :(',0xa
-	cerrlen      equ $-cerrmsg
-	; The prompt text for getting input from the user
-	 
-	szIp         db '127.0.0.1',0
-	szPort       db '43774',0
 	 
 section .bss
 	; Allocate uninitialized memory the socket we're going to create
 	sock         resd 1
-
 	; sockaddr_in is a C struct used by the sockets API to store information about the socket (Address family, port and address)
 	sockaddr_in resb 16
-
 	; socket port
-	sport       resb 2
+	port       resb 2
 	; data buffer
-	buff        resb 1024
 	buffer resb 254
-
 	; The buffer to hold the user's data
 	out_buff resb 256

@@ -22,6 +22,16 @@ global _start
 section .text
 
 _start:
+	; Get the CLI arguments
+	pop ebx
+	; Verify that we have the right number of arguments
+	cmp ebx, 2
+	jnz serverUsage
+	; Get the port argument
+	pop esi
+	;mov esi, ecx
+	call initPort
+	;mov [port], eax
 	xor eax, eax
 	
 socke:
@@ -145,6 +155,7 @@ recv:
 	jmp recv
 
 readInput:
+	; Get input from user
 	call userInput
 	; Move the socket's fd to edx
 	mov edx, [sock]
@@ -160,6 +171,7 @@ section .data
 section .bss
 	; The socket's file descriptor
 	sock resd 1
+	bind_addr resb 16
 	; The input and output buffers
 	buffer resb 254
 	out_buff resb 256

@@ -39,13 +39,15 @@ initPort:
 	; ----
 	xor eax,eax
 	xor ebx,ebx
+	xor edx, edx
 	.getChar:   
 		lodsb      
 		test al, al
 		jz .end
 		sub al, '0'
 		imul ebx, 10
-		add ebx, eax   
+		add ebx, eax
+		inc edx 
 		jmp .getChar
 	.end:
 		xchg ebx, eax   
@@ -68,6 +70,26 @@ exit:
 	mov eax, 1
 	push eax
 	int 0x80
+
+clientUsage:
+	mov ecx, clientUse
+	mov edx, c_usagelen
+	call print
+	call exit
+
+serverUsage:
+	mov ecx, serverUse
+	mov edx, s_usagelen
+	call print
+	call exit
+
+
+fail:
+  ; In case something wen't wrong, print an error msg and quit.
+  mov edx, cerrlen
+  mov ecx, cerrmsg
+  call print
+  call exit
 
 print:
 	; Docstring: Print a string
@@ -100,4 +122,26 @@ printOther:
 	mov edx, promptlen
 	mov eax, SYS_WRITE
 	int 0x80
+	ret
+
+decToHex:
+	; input in ebx
+	xor edi,edi
+	mov eax, 1
+	xor ecx, ecx
+	test ebx, ebx       ;; If input = 0 , output = 0
+	jz EndProcess
+	StartProcess:
+			mov ecx, ebx            
+			and ecx, 0xf ;; Take the last digit
+			push eax
+			mul ecx              
+			add edi, eax
+			pop eax
+			imul eax, 10       ;; Prepare the next place.
+			shr ebx, 4
+			jz EndProcess
+	jmp StartProcess
+	EndProcess:
+		mov eax, edi
 	ret
