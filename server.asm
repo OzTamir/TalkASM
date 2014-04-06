@@ -24,14 +24,12 @@ section .text
 _start:
 	xor eax, eax
 	
-socke:
+run_server:
 	; Get the socket's fd in eax
 	call socket
 	; We store the socket's file descriptor in ESI for later
 	mov esi, eax
 	mov [sock], eax
-
-run_server:
 	; Get the port number specified
 	mov edi, serverPort
 
