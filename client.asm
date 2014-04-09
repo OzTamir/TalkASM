@@ -1,28 +1,11 @@
-;using sockets on linux with the 0x80 inturrprets.
-;
-;assemble
-;  nasm -o socket.o -f elf32 -g socket.asm
-;link
-;  ld -o socket socket.o
-;
-; My Version:
-;		nasm -o socket.o -f elf32 -g client.asm 
-;		ld -m elf_i386 socket.o -o client
-
-;
-
-;Just some assigns for better readability
+; TalkASM - Simple Chat Written By OzTamir (Server)
+;--------------------------------------------------
 global _start
 %include "constants.asm"
 %include "util.asm"
 %include "sockets.asm"
 
 section .text
-
-;--------------------------------------------------
-;Main code body
-;--------------------------------------------------
- 
 _start:
 	; Get the CLI arguments and parse it
 	pop ebx
