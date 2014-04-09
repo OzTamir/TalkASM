@@ -1,7 +1,7 @@
-Chatsm - Simple Chat written in x86 NASM
+TalkASM - Simple Chat written in x86 NASM
 ============
 
-![Chatsm Preview](https://raw2.github.com/OzTamir/NASM-Sockets/master/static/img/demo.png)
+![TalkASM Preview](https://raw2.github.com/OzTamir/TalkASM/master/demo.png)
 
 Two main files:
 ---
@@ -18,5 +18,3 @@ Other Files:
  - constant.asm: int 0x80 interrupts codes assigment to ease readabilty.
  - data.asm: Mostly strings to use during the run of the programs.
  - util.asm: Utilities subroutines to avoid duplicating code over the two versions (Input, Output, Exit and such).
-
-Written by Oz Tamir and distrbuted under Apache License 2.0.
