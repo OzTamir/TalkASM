@@ -1,18 +1,4 @@
-; Remote shell - this code will setup a localhost server and will spawn a shell for
-; 				 the connected socket
-; Written by Oz Tamir with insparation from @arno01
-;----------------
-; Global note:
-; The syntax for making a socketcall in C is:
-; int socketcall(int call, unsigned long *args);
-;
-; Therefor, any socketcall will be carried out as described here:
-; EAX - 102, the socketcall API number.
-; EBX - The call we would like to preform (socket, bind, send and so on)
-; ECX - The args for the specific call
-; 
-; This is the general syntax for socketcalls in this code, and to prevent redundency I will only
-; explain the specific subcall when one is being made.
+; TalkASM - Simple Chat Written By OzTamir (Server)
 ;----------------
 global _start
 %include "constants.asm"
