@@ -1,11 +1,28 @@
-; TalkASM - Simple Chat Written By OzTamir (Server)
-;--------------------------------------------------
+;using sockets on linux with the 0x80 inturrprets.
+;
+;assemble
+;  nasm -o socket.o -f elf32 -g socket.asm
+;link
+;  ld -o socket socket.o
+;
+; My Version:
+;		nasm -o socket.o -f elf32 -g client.asm 
+;		ld -m elf_i386 socket.o -o client
+
+;
+
+;Just some assigns for better readability
 global _start
 %include "constants.asm"
 %include "util.asm"
 %include "sockets.asm"
 
 section .text
+
+;--------------------------------------------------
+;Main code body
+;--------------------------------------------------
+ 
 _start:
 	; Get the CLI arguments and parse it
 	pop ebx
@@ -46,6 +63,13 @@ readInput:
 	; Send the message over the socket
 	mov edx, [sock]
 	call send
+	
+	;Check if the user want to quit
+	mov esi, out_buff
+	call cmpstr
+	cmp eax, 0
+	je exit
+	
 	; Thats it for today.
 	jmp readInput
 
@@ -76,10 +100,19 @@ recv:
 	jz fail
 	cmp eax, 0
 	jz exit
+	
+	mov esi, buffer
+	push eax
+	call cmpstr
+	cmp eax, 0
+	je recvExit
+	pop eax
+	
 	mov edx, eax
 	mov ecx, buffer
 	call printOther
 	jmp recv
+
 
 section .data
 	%include "data.asm"

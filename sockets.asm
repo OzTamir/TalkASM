@@ -72,6 +72,13 @@ send:
 	pop ebp
 	ret
 
+recvExit:
+	pop ecx
+	mov edx, [sock]
+	mov eax, buffer
+	call send
+	jmp exit
+
 ;--------------------------------------------------
 ; Server Functions:
 ;--------------------------------------------------

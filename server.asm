@@ -1,4 +1,18 @@
-; TalkASM - Simple Chat Written By OzTamir (Server)
+; Remote shell - this code will setup a localhost server and will spawn a shell for
+; 				 the connected socket
+; Written by Oz Tamir with insparation from @arno01
+;----------------
+; Global note:
+; The syntax for making a socketcall in C is:
+; int socketcall(int call, unsigned long *args);
+;
+; Therefor, any socketcall will be carried out as described here:
+; EAX - 102, the socketcall API number.
+; EBX - The call we would like to preform (socket, bind, send and so on)
+; ECX - The args for the specific call
+; 
+; This is the general syntax for socketcalls in this code, and to prevent redundency I will only
+; explain the specific subcall when one is being made.
 ;----------------
 global _start
 %include "constants.asm"
@@ -123,6 +137,14 @@ recv:
 	jz exit
 	cmp eax, 0
 	jz recv
+	
+	mov esi, buffer
+	push eax
+	call cmpstr
+	cmp eax, 0
+	je recvExit
+	pop eax
+	
 	mov edx, eax
 	mov ecx, buffer
 	call printOther
@@ -135,6 +157,13 @@ readInput:
 	mov edx, [sock]
 	; Send it!
 	call send
+	
+	;Check if the user want to quit
+	mov esi, out_buff
+	call cmpstr
+	cmp eax, 0
+	je exit
+	
 	jmp readInput
   
 section .data

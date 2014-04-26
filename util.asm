@@ -118,6 +118,17 @@ printOther:
 	int 0x80
 	ret
 
+cmpstr:
+	; Docstring: Check if the user want to quit.
+	; Args: str1 -> esi.
+	; ----
+	mov edi, exitSTR
+	mov ecx, exitLen + 1
+	cld
+	repe cmpsb
+	mov eax, ecx
+	ret
+
 decToHex:
 	; input in ebx
 	xor edi,edi
