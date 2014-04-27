@@ -7,6 +7,8 @@ extern  gtk_init, gtk_builder_new, gtk_builder_add_from_file, gtk_builder_get_ob
 extern gtk_builder_connect_signals, g_object_unref, gtk_widget_show_all, gtk_main
 extern gtk_main_quit, g_signal_connect_data, gtk_text_view_set_buffer, gtk_text_buffer_set_text
 
+extern gtk_text_view_append
+
 ; Appedn to textview
 extern gtk_text_view_get_buffer, gtk_text_buffer_get_end_iter, gtk_text_buffer_insert, gtk_entry_get_text, gtk_text_buffer_new, gtk_text_view_set_buffer
 
@@ -133,27 +135,31 @@ main:
     ret
 
 event_clicked:
-	push NULL
-	call gtk_text_buffer_new
-	add esp, 4 * 1
-	mov [oTextBuffer], eax
-	
 	push	dword [oEntry]
-	call	gtk_entry_get_text
-	add		esp, 4 * 1
-	mov		[oText], eax
-	
-	push -1
-	push dword [oText]
-	push dword [oTextBuffer]
-	call gtk_text_buffer_set_text
-	add esp, 4 * 3
-	
-	
-	push	dword [oTextBuffer]
-	push	dword [oChatView]
-	call	gtk_text_view_set_buffer
-	add		esp, 4 * 2
+	push 	dword [oChatView]
+	call gtk_text_view_append
+	add esp, 4 * 2
+	;~ push NULL
+	;~ call gtk_text_buffer_new
+	;~ add esp, 4 * 1
+	;~ mov [oTextBuffer], eax
+	;~ 
+	;~ push	dword [oEntry]
+	;~ call	gtk_entry_get_text
+	;~ add		esp, 4 * 1
+	;~ mov		[oText], eax
+	;~ 
+	;~ push -1
+	;~ push dword [oText]
+	;~ push dword [oTextBuffer]
+	;~ call gtk_text_buffer_set_text
+	;~ add esp, 4 * 3
+	;~ 
+	;~ 
+	;~ push	dword [oTextBuffer]
+	;~ push	dword [oChatView]
+	;~ call	gtk_text_view_set_buffer
+	;~ add		esp, 4 * 2
 	ret
 
 event_delete:
