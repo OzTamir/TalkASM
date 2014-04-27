@@ -197,7 +197,7 @@ recv:
 	; push the length of data to read from socket
 	push 253
 	; push the data buffer to read into
-	push dword [buffer]
+	push buffer
 	; push the client's socket fd
 	push dword [sock]
 	; Move the pointer to recv() args into ECX and make the API call
@@ -207,7 +207,7 @@ recv:
 	mov ebx, SYS_RECV
 	int 0x80
 	
-	push dword [buffer]
+	push buffer
 	push dword [oChatView]
 	call AddTextToBuffer
 	add esp, 4 * 2
