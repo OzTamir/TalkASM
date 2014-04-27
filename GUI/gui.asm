@@ -12,8 +12,10 @@ extern gtk_builder_connect_signals, g_object_unref, gtk_widget_show_all, gtk_mai
 extern gtk_main_quit, g_signal_connect_data, gtk_text_view_set_buffer, gtk_text_buffer_set_text
 extern gtk_entry_set_text, gtk_entry_get_text, gtk_entry_get_text_length
 
+extern g_io_add_watch, g_io_channel_unix_new, g_timeout_add
+
 ;Own functions
-extern gtk_text_view_append
+extern gtk_text_view_append, AddTextToBuffer
 
 section .data
 	%include "data.asm"
@@ -56,6 +58,8 @@ section .bss
 	buffer resb 254
 	; The buffer to hold the user's data
 	out_buff resb 256
+	
+	sockChannel resd 1
 
 section .text
 main:     
@@ -165,6 +169,49 @@ setup_client:
 	mov [sock], eax
 	mov si, [port]
 	call connect
+	
+	push	dword [sock]
+	call	g_io_channel_unix_new
+	add esp, 4*1
+	
+	push	NULL
+	push	recv
+	push	1;G_IO_IN
+	push	eax
+	call g_io_add_watch
+	add esp, 4 * 4
+	ret
+
+recv:
+	; Docstring: Accept an incoming connection
+	; Socketcall subcall: Recv (10)
+	; The C syntax for this label is:
+	; ssize_t recv(int s, void *buf, size_t len, int flags);
+	; s - is the client's socket fd and it's int EAX, buf - data buffer to read into, size_t - how much to read, flags - nothing (0)
+	; ----
+	;
+	; Move the socket fd (of the client) to edx
+	;mov edx, [sock]
+	; push the flags (nothing in our case)
+	push 0
+	; push the length of data to read from socket
+	push 253
+	; push the data buffer to read into
+	push dword [buffer]
+	; push the client's socket fd
+	push dword [sock]
+	; Move the pointer to recv() args into ECX and make the API call
+	mov ecx, esp
+	add esp, 4 * 4
+	mov eax, SYS_socketcall
+	mov ebx, SYS_RECV
+	int 0x80
+	
+	push dword [buffer]
+	push dword [oChatView]
+	call AddTextToBuffer
+	add esp, 4 * 2
+	mov eax, 1
 	ret
 
 event_clicked:
