@@ -1,17 +1,22 @@
 global main
 
+%include "constants.asm"
+%include "util.asm"
+%include "sockets.asm"
+
 %assign NULL 0
 
 ;GTK
 extern  gtk_init, gtk_builder_new, gtk_builder_add_from_file, gtk_builder_get_object
 extern gtk_builder_connect_signals, g_object_unref, gtk_widget_show_all, gtk_main
 extern gtk_main_quit, g_signal_connect_data, gtk_text_view_set_buffer, gtk_text_buffer_set_text
-extern gtk_entry_set_text
+extern gtk_entry_set_text, gtk_entry_get_text, gtk_entry_get_text_length
 
 ;Own functions
 extern gtk_text_view_append
 
 section .data
+	%include "data.asm"
 	; GUI IDs
     szGladeFile db 'chat.glade', 0
     szIDMainWin db 'mWin', 0
@@ -26,6 +31,8 @@ section .data
     szevent_delete      db  "delete-event", 0
 	szevent_destroy     db  "destroy", 0
 	szevent_clicked     db  "clicked", 0
+	
+	localhost db '127.0.0.1', 0
 
 
 section .bss
@@ -38,8 +45,19 @@ section .bss
     oSendBtn resd 1
     oTextBuffer resd 1
     oText resd 1
+    
+    ; Allocate uninitialized memory the socket we're going to create
+	sock         resd 1
+	; sockaddr_in is a C struct used by the sockets API to store information about the socket (Address family, port and address)
+	sockaddr_in resb 16
+	; socket port
+	port       resb 2
+	; data buffer
+	buffer resb 254
+	; The buffer to hold the user's data
+	out_buff resb 256
 
-section .text 
+section .text
 main:     
     push    0 
     push    0
@@ -130,10 +148,36 @@ main:
     push    dword [oMain]
     call    gtk_widget_show_all
     add     esp, 4 * 1
+    
+    call 	setup_client
     call    gtk_main
     ret
 
+setup_client:
+	mov esi, localhost
+	mov edi, sockaddr_in
+	call initIP
+	; Get the Port argument
+	mov esi, clientPort
+	call initPort
+	mov [port], eax
+	call socket
+	mov [sock], eax
+	mov si, [port]
+	call connect
+	ret
+
 event_clicked:
+	push dword [oEntry]
+	call gtk_entry_get_text_length
+	add esp, 4 * 1
+	mov ecx, eax
+	push dword [oEntry]
+	call gtk_entry_get_text
+	add esp, 4 * 1
+	mov edx, [sock]
+	call send
+
 	push	dword [oEntry]
 	push 	dword [oChatView]
 	call gtk_text_view_append
