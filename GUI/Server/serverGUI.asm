@@ -3,6 +3,7 @@ global main
 %include "constants.asm"
 %include "util.asm"
 %include "sockets.asm"
+%include "macros.asm"
 
 %assign NULL 0
 
@@ -34,7 +35,7 @@ section .data
 	szevent_destroy     db  "destroy", 0
 	szevent_clicked     db  "clicked", 0
 	
-	localhost 			db '127.0.0.1', 0
+	bind_all 			db '0.0.0.0', 0
 
 
 section .bss
@@ -50,6 +51,7 @@ section .bss
     oText 		resd 1
     
     ; Socket data
+    bind_addr	resd 1
 	sock		resd 1
 	sockaddr_in resb 16
 	port		resb 2
@@ -153,19 +155,16 @@ main:
     call 	setup_client
     call    gtk_main
     ret
-
+   
 setup_client:
-	mov		esi, localhost
-	mov		edi, sockaddr_in
-	call 	initIP
-	; Get the Port argument
-	mov 	esi, clientPort
-	call 	initPort
-	mov 	[port], eax
-	call 	socket
-	mov 	[sock], eax
-	mov 	si, [port]
-	call 	connect
+	call socket
+	mov [sock], eax
+	mov edi, eax
+	; Get the port number specified
+	bind 0, edi
+	listen sock
+	accept NULL, NULL, sock
+	mov [sock], eax
 	
 	push	dword [sock]
 	call	g_io_channel_unix_new
@@ -206,7 +205,6 @@ recv:
 	int 	0x80
 	
 	; Append the recived data to the text view
-	push	1
 	push 	buffer
 	push 	dword [oChatView]
 	call 	AddTextToBuffer

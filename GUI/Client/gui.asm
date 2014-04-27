@@ -206,7 +206,6 @@ recv:
 	int 	0x80
 	
 	; Append the recived data to the text view
-	push	1
 	push 	buffer
 	push 	dword [oChatView]
 	call 	AddTextToBuffer
