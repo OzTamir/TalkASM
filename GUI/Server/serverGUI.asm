@@ -157,19 +157,27 @@ main:
     ret
    
 setup_client:
+	mov esi, bind_all
+	mov edi, sockaddr_in
+	call initIP
+	
+	mov esi, clientPort
+	call initPort
+	mov [port], eax
+	
 	call socket
 	mov [sock], eax
-	mov edi, eax
 	; Get the port number specified
-	bind 0, edi
-	listen sock
-	accept NULL, NULL, sock
+	mov si, [port]
+	bind si, edi, eax
+	listen eax
+	accept NULL, NULL, eax
 	mov [sock], eax
-	
+	ret
 	push	dword [sock]
 	call	g_io_channel_unix_new
 	add 	esp, 4*1
-	
+
 	push	NULL
 	push	recv
 	;We want G_IO_IN condition - call recv when data is available to read
