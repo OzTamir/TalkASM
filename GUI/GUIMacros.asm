@@ -24,3 +24,10 @@
     call    g_signal_connect_data
     add     esp, 4 * 6
 %endmacro
+
+%macro newString 2
+	; Init a strig variable
+	; %1 - Variable Name
+	; %2 - Variable value
+	%1	db %2, 0
+%endmacro

@@ -1,5 +1,5 @@
-gui: gui.o    
-	gcc -o gui gui.o `pkg-config --cflags --libs gtk+-3.0` -lc 'util.c'
+client: client.o    
+	gcc -o client client.o `pkg-config --cflags --libs gtk+-3.0` -lc 'Server/util.c'
 
-gui.o: gui.asm
-	nasm -f elf gui.asm 
+client.o: client.asm
+	nasm -f elf client.asm 

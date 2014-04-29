@@ -51,7 +51,7 @@ send:
 	;
 	; Push the flags (none)
 	push dword 0
-	; Push the length (we stored it in ecx on 'readInput'
+	; Push the length (we stored it in ecx on 'readInput')
 	push ecx
 	; Push the data itself
 	push eax
