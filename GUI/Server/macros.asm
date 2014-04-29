@@ -46,22 +46,6 @@
 	socketcall SYS_ACCEPT
 %endmacro
 
-%macro hfail 0
-	cmp eax, -1
-	jz fail
-%endmacro
-
-%macro	sockaddr_in	2
-	; %1 - Port
-	; %2 - in_addr (socket address)
-	push 0
-	push %2
-	push %1
-	push AF_INET
-	mov ecx, esp
-	add esp, 4 * 4
-%endmacro
-
 %macro	socketcall 1
 	; %1 - Subcall
 	mov eax, SYS_socketcall

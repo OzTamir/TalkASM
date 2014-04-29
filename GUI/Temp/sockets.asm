@@ -18,10 +18,10 @@ socket:
 	push BYTE SOCK_STREAM
 	push BYTE AF_INET
 	mov ecx, esp
-	add esp, 4 * 3
 	; Call the socket API
 	int 0x80
 	; Align the stack to avoid seg. fault
+	add esp, 4 * 3
 	ret
 
 userInput:
@@ -77,7 +77,7 @@ recvExit:
 ;--------------------------------------------------
 ; Server Functions:
 ;--------------------------------------------------
-	
+
 
 ;--------------------------------------------------
 ; Client Functions:

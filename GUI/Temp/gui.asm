@@ -34,7 +34,7 @@ section .data
 	szevent_destroy     db  "destroy", 0
 	szevent_clicked     db  "clicked", 0
 	
-	localhost 			db '127.0.0.1'
+	localhost 			db '127.0.0.1', 0
 
 
 section .bss
@@ -206,6 +206,7 @@ recv:
 	int 	0x80
 	
 	; Append the recived data to the text view
+	push	1
 	push 	buffer
 	push 	dword [oChatView]
 	call 	AddTextToBuffer
