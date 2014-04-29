@@ -21,15 +21,6 @@ extern gtk_text_view_append, AddTextToBuffer
 
 section .data
 	%include		"data.asm"
-	; GUI IDs
-    szGladeFile		db 'chat.glade', 0
-    szIDMainWin 	db 'mWin', 0
-    szIDMainGrid 	db 'mGrid', 0
-    szIDchatView 	db 'chatView', 0
-    szIDSubGrid 	db 'sGrid', 0
-    szIDEntry 		db 'entry', 0
-    szIDSendBtn 	db 'send', 0
-    szEmptyString 	db '', 0
     
     szIDDialog	db "serverDialog", 0
     szIDPortEntry db "portEntry1", 0
@@ -258,6 +249,10 @@ event_clicked:
 	ret
 
 event_delete:
+	mov ecx, exitLen
+	mov eax, exitSTR
+	mov edx, [sock]
+	call send
     call    gtk_main_quit
     mov 	eax, 0
     ret     
