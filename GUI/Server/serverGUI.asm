@@ -4,6 +4,7 @@ global main
 %include "util.asm"
 %include "sockets.asm"
 %include "macros.asm"
+%include "../GUIMacros.asm"
 
 %assign NULL 0
 
@@ -61,130 +62,104 @@ section .bss
 	sockChannel resd 1
 
 section .text
-main:     
+main:
+	; Call gtk_init with no arguments
     push    0 
     push    0
     call    gtk_init
     add     esp, 4 * 2   
     
+    ; Get a GtkBuilder object
     call    gtk_builder_new
     mov     [oBuilder], eax
-        
+    
+    ; Load Glade File into our GtkBuilder
     push    NULL  
     push    szGladeFile
     push    eax 
     call    gtk_builder_add_from_file
     add     esp, 4 * 3 
     
-    push    szIDMainWin
-    push    dword [oBuilder]
-    call    gtk_builder_get_object 
-    add     esp, 4 * 2
-    mov     [oMain], eax
+    ; Add The Top-Level Window
+    addWidget oBuilder, szIDMainWin, oMain
     
-    push    szIDMainGrid
-    push    dword [oBuilder]
-    call    gtk_builder_get_object
-    add     esp, 4 * 2
-    mov     [oMainGrid], eax
+    ; Add the Main Grid
+    addWidget oBuilder, szIDMainGrid, oMainGrid
     
-    push    szIDchatView
-    push    dword [oBuilder]
-    call    gtk_builder_get_object
-    add     esp, 4 * 2
-    mov     [oChatView], eax
-
-    push    szIDSubGrid
-    push    dword [oBuilder]
-    call    gtk_builder_get_object
-    add     esp, 4 * 2
-    mov     [oSubGrid], eax
-
-    push    szIDEntry
-    push    dword [oBuilder]
-    call    gtk_builder_get_object
-    add     esp, 4 * 2
-    mov     [oEntry], eax
+    ; Add the Text View to display the chat in
+    addWidget oBuilder, szIDchatView, oChatView
     
-    push    szIDSendBtn
-    push    dword [oBuilder]
-    call    gtk_builder_get_object
-    add     esp, 4 * 2
-    mov     [oSendBtn], eax
-
+    ; Add the grid to contain the entry and send button
+    addWidget oBuilder, szIDSubGrid, oSubGrid
+    
+    ; Add the text entry widget
+    addWidget oBuilder, szIDEntry, oEntry
+    
+    ; Add the send button
+    addWidget oBuilder, szIDSendBtn, oSendBtn
+    
+    ; Connect the signals
     push    dword [oBuilder]  
     call    gtk_builder_connect_signals
     add     esp, 4 * 1
     
-    ;Signals
-    push    NULL
-    push    NULL
-    push    NULL
-    push    event_delete
-    push    szevent_delete
-    push    dword [oMain]
-    call    g_signal_connect_data
-    add     esp, 4 * 6
+    ; Events
+    ; Call 'event_delete' in case oMain is deleted
+    addEvent event_delete, szevent_delete, oMain
     
-    push    NULL
-    push    NULL
-    push    NULL
-    push    event_destroy
-    push    szevent_destroy
-    push    dword [oMain]
-    call    g_signal_connect_data
-    add     esp, 4 * 6
-        
-    push    NULL
-    push    NULL
-    push    NULL
-    push    event_clicked
-    push    szevent_clicked
-    push    dword [oSendBtn]
-    call    g_signal_connect_data
-    add     esp, 4 * 6
+    ; Call 'event_destroy' in case oMain is destroyed
+    addEvent event_destroy, szevent_destroy, oMain
     
+    ; Call 'event_clicked' in case oSendBtn is clicked
+    addEvent event_clicked, szevent_clicked, oSendBtn
+    
+    ; Remove the refrence to the GtkBuilder (We won't need it anymore)
     push    dword [oBuilder]
     call    g_object_unref 
     add     esp, 4 * 1   
-
+    
+    ; Prepere our Top-Level widget for display
     push    dword [oMain]
     call    gtk_widget_show_all
     add     esp, 4 * 1
     
-    call 	setup_client
+    ; Setup the Socket Server
+    call 	setup_server
+    ; Run the GUI
     call    gtk_main
     ret
    
-setup_client:
+setup_server:
 	; Get addr
-	mov esi, bind_all
-	mov edi, sockaddr_in
-	call initIP
+	mov 	esi, bind_all
+	mov 	edi, sockaddr_in
+	call 	initIP
 	
 	; Get Port
-	mov esi, clientPort
-	call initPort
-	mov [port], eax
+	mov 	esi, clientPort
+	call 	initPort
+	mov 	[port], eax
 	
 	; Get socket
-	call socket
-	mov [sock], eax
+	call 	socket
+	mov 	[sock], eax
 	
 	; Bind socket
-	mov si, [port]
-	bind si, edi, sock
+	mov 	si, [port]
+	bind 	si, edi, sock
 	
 	; Listen to socket
-	listen sock
+	listen 	sock
 	; Accept connection
-	accept NULL, NULL, sock
-	mov [sock], eax
+	accept 	NULL, NULL, sock
+	mov		[sock], eax
 	
+	; Get a GIOChannel from the socket's FD
 	push	dword [sock]
 	call	g_io_channel_unix_new
 	add 	esp, 4*1
-
+	
+	; Watch the socket for I/O
 	push	NULL
 	push	recv
 	;We want G_IO_IN condition - call recv when data is available to read
@@ -224,6 +199,8 @@ recv:
 	push 	dword [oChatView]
 	call 	AddTextToBuffer
 	add 	esp, 4 * 2
+	
+	; Return true to avoid infinite loop
 	mov 	eax, 1
 	ret
 
@@ -253,9 +230,7 @@ event_delete:
     call    gtk_main_quit
     mov 	eax, 0
     ret     
-    
-;~ void event_destroy( GtkWidget *widget,
-                    ;~ gpointer   data )
+
 event_destroy:    
     call    gtk_main_quit
     ret
