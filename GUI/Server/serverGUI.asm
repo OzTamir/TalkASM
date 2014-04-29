@@ -157,23 +157,30 @@ main:
     ret
    
 setup_client:
+	; Get addr
 	mov esi, bind_all
 	mov edi, sockaddr_in
 	call initIP
 	
+	; Get Port
 	mov esi, clientPort
 	call initPort
 	mov [port], eax
 	
+	; Get socket
 	call socket
 	mov [sock], eax
-	; Get the port number specified
+	
+	; Bind socket
 	mov si, [port]
-	bind si, edi, eax
-	listen eax
-	accept NULL, NULL, eax
+	bind si, edi, sock
+	
+	; Listen to socket
+	listen sock
+	; Accept connection
+	accept NULL, NULL, sock
 	mov [sock], eax
-	ret
+	
 	push	dword [sock]
 	call	g_io_channel_unix_new
 	add 	esp, 4*1

@@ -13,7 +13,7 @@ clientUse      db 'ERROR!', 0xa, 'Usage: ./client <Server IP> <PORT>', 0xa
 c_usagelen      equ $-clientUse
 
 ; Port settings
-;~ serverPort	db 0xaa, 0xff
+serverPort	db 0xaa, 0xff
 clientPort db '43775',0
 
 ; Exit settings

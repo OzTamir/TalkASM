@@ -11,7 +11,7 @@
 	; push sockaddr
 	push %2
 	; Finnaly, push the socket fd from ESI
-	push %3
+	push dword [%3]
 	; Move the pointer to bind() args into ECX and make the API call
 	mov ecx, esp
 	add esp, 4 * 3
@@ -21,9 +21,9 @@
 %macro	listen 1
 	; %1 - Socket FD
 	; The size of the queue allowed
-	push BYTE 10
+	push dword 1
 	; The socket fd
-	push %1
+	push dword [%1]
 	; Move the pointer to listen() args into ECX and make the API call
 	mov ecx, esp
 	add esp, 4 * 2
@@ -39,11 +39,16 @@
 	; push addr (0 - NULL)
 	push dword %2
 	; push sockfd
-	push %3
+	push dword [%3]
 	; Move the pointer to accept() args into ECX and make the API call
 	mov ecx, esp
 	add esp, 4 * 3
 	socketcall SYS_ACCEPT
+%endmacro
+
+%macro hfail 0
+	cmp eax, -1
+	jz fail
 %endmacro
 
 %macro	sockaddr_in	2
