@@ -1,5 +1,5 @@
 #include <gtk/gtk.h>
-#include <glib.h>
+
 void AddTextToBuffer(GtkWidget *textview, gchar *text);
 
 void gtk_text_view_append(GtkWidget *textview, GtkWidget *entry)
@@ -13,8 +13,6 @@ void gtk_text_view_append(GtkWidget *textview, GtkWidget *entry)
 
 void AddTextToBuffer(GtkWidget *textview, gchar *text)
 {
-	if(text == NULL)
-		return;
 	//Append a string to a textview
 	GtkTextBuffer *tbuffer;
 	GtkTextIter ei;

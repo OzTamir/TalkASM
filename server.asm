@@ -1,114 +1,177 @@
-; Remote shell - this code will setup a localhost server and will spawn a shell for
-; 				 the connected socket
-; Written by Oz Tamir with insparation from @arno01
-;----------------
-; Global note:
-; The syntax for making a socketcall in C is:
-; int socketcall(int call, unsigned long *args);
-;
-; Therefor, any socketcall will be carried out as described here:
-; EAX - 102, the socketcall API number.
-; EBX - The call we would like to preform (socket, bind, send and so on)
-; ECX - The args for the specific call
-; 
-; This is the general syntax for socketcalls in this code, and to prevent redundency I will only
-; explain the specific subcall when one is being made.
-;----------------
-global _start
+global main
+
 %include "constants.asm"
 %include "util.asm"
 %include "sockets.asm"
+%include "macros.asm"
+%include "GUIMacros.asm"
+
+%assign NULL 0
+
+;GTK
+extern  gtk_init, gtk_builder_new, gtk_builder_add_from_file, gtk_builder_get_object
+extern gtk_builder_connect_signals, g_object_unref, gtk_widget_show_all, gtk_main, gtk_widget_hide
+extern gtk_main_quit, g_signal_connect_data, gtk_text_view_set_buffer, gtk_text_buffer_set_text
+extern gtk_entry_set_text, gtk_entry_get_text, gtk_entry_get_text_length, gtk_dialog_run
+
+extern g_io_add_watch, g_io_channel_unix_new, g_timeout_add
+
+;Own functions
+extern gtk_text_view_append, AddTextToBuffer
+
+section .data
+	%include		"data.asm"
+	; GUI IDs
+    szGladeFile		db 'chat.glade', 0
+    szIDMainWin 	db 'mWin', 0
+    szIDMainGrid 	db 'mGrid', 0
+    szIDchatView 	db 'chatView', 0
+    szIDSubGrid 	db 'sGrid', 0
+    szIDEntry 		db 'entry', 0
+    szIDSendBtn 	db 'send', 0
+    szEmptyString 	db '', 0
+    
+    szIDDialog	db "serverDialog", 0
+    szIDPortEntry db "portEntry1", 0
+    szIDRunBtn	db "runBtn", 0
+    szIDBindEntry	db 'entry1', 0
+    ; Events
+    szevent_delete      db  "delete-event", 0
+	szevent_destroy     db  "destroy", 0
+	szevent_clicked     db  "clicked", 0
+	
+
+
+section .bss
+	; GUI Data
+    oBuilder 	resd 1
+    oMain 		resd 1
+    oMainGrid 	resd 1
+    oChatView 	resd 1
+    oSubGrid 	resd 1
+    oEntry 		resd 1
+    oSendBtn 	resd 1
+    oTextBuffer resd 1
+    oText 		resd 1
+    
+    oDialog		resd 1
+    oRunBtn		resd 1
+    oPortEntry	resd 1
+    oBindEntry	resd 1
+    
+    ; Socket data
+    bind_addr	resd 1
+	sock		resd 1
+	sockaddr_in resb 16
+	port		resb 2
+	buffer 		resb 254
+	out_buff 	resb 256
+	
+	sockChannel resd 1
 
 section .text
-
-_start:
-	xor eax, eax
+main:
+	; Call gtk_init with no arguments
+    push    0 
+    push    0
+    call    gtk_init
+    add     esp, 4 * 2   
+    
+    ; Get a GtkBuilder object
+    call    gtk_builder_new
+    mov     [oBuilder], eax
+    
+    ; Load Glade File into our GtkBuilder
+    push    NULL  
+    push    szGladeFile
+    push    eax 
+    call    gtk_builder_add_from_file
+    add     esp, 4 * 3 
+    
+    addWidget oBuilder, szIDDialog, oDialog
+    addWidget oBuilder, szIDRunBtn, oRunBtn
+    addWidget oBuilder, szIDPortEntry, oPortEntry
+    addWidget oBuilder, szIDBindEntry, oBindEntry
+    
+    ; Add The Top-Level Window
+    addWidget oBuilder, szIDMainWin, oMain
+    
+    ; Add the Main Grid
+    addWidget oBuilder, szIDMainGrid, oMainGrid
+    
+    ; Add the Text View to display the chat in
+    addWidget oBuilder, szIDchatView, oChatView
+    
+    ; Add the grid to contain the entry and send button
+    addWidget oBuilder, szIDSubGrid, oSubGrid
+    
+    ; Add the text entry widget
+    addWidget oBuilder, szIDEntry, oEntry
+    
+    ; Add the send button
+    addWidget oBuilder, szIDSendBtn, oSendBtn
+    
+    ; Connect the signals
+    push    dword [oBuilder]  
+    call    gtk_builder_connect_signals
+    add     esp, 4 * 1
+    
+    ; Events
+    ; Call 'event_delete' in case oMain is deleted
+    addEvent event_delete, szevent_delete, oMain
+    
+    ; Call 'event_destroy' in case oMain is destroyed
+    addEvent event_destroy, szevent_destroy, oMain
+    
+    ; Call 'event_clicked' in case oSendBtn is clicked
+    addEvent event_clicked, szevent_clicked, oSendBtn
+    
+    addEvent run_clicked, szevent_clicked, oRunBtn
+    
+    ; Remove the refrence to the GtkBuilder (We won't need it anymore)
+    push    dword [oBuilder]
+    call    g_object_unref 
+    add     esp, 4 * 1   
+    
+    ; Prepere our Top-Level widget for display
+    push	dword [oDialog]
+    call 	gtk_dialog_run
+    add esp, 4 * 1
+    
+    ; Setup the Socket Server
+    ;call 	setup_server
+    ; Run the GUI
+    call    gtk_main
+    ret
+   
+setup_server:
+	call 	socket
+	mov 	[sock], eax
 	
-run_server:
-	; Get the socket's fd in eax
-	call socket
-	; We store the socket's file descriptor in ESI for later
-	mov esi, eax
-	mov [sock], eax
-	; Get the port number specified
-	mov edi, serverPort
-
-bind:
-	; Docstring: Bind the socket we've created to the IP and port we'll supply.
-	; Socketcall subcall: Bind (2)
-	; The C syntax for this label is:
-	; int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-	; (sockfd - stored in esi, sockaddr - {2 - AF_INET, 43775 - Port Number, 0 - host addr (0.0.0.0 means ANY host)},																			16 - length of an IPv4 addr)
-	; ----
-	mov eax, SYS_socketcall
-	mov ebx, SYS_BIND
-	; -- Here we are building the sockaddr struct --
-	; Push 0.0.0.0 as host address
-	xor edx, edx
-	push edx
-	; Push the port number
-	push WORD [edi]
-	; Push the address family, 2, using the fact that it's also the current socketcall call number. Neat, right?
-	push WORD bx
-	; -- Store the struct in ECX and push the remaining args.
-	mov ecx, esp
-	; push addrlen
-	push BYTE 16
-	; push sockaddr
-	push ecx
-	; Finnaly, push the socket fd from ESI
-	push esi
-	; Move the pointer to bind() args into ECX and make the API call
-	mov ecx, esp
-	int 0x80
-
-listen:
-	; Docstring: Set listening mode and wait for incoming connections
-	; Socketcall subcall: Listen (4)
-	; The C syntax for this label is:
-	; int listen(int s, int backlog);  
-	; s - the socket fd, backlog - the number of queue allowed
-	; ----
-	;
-	mov BYTE al, SYS_socketcall
-	mov ebx, SYS_LISTEN
-	; The size of the queue allowed
-	push BYTE 10
-	; The socket fd
-	push esi
-	; Move the pointer to listen() args into ECX and make the API call
-	mov ecx, esp
-	int 0x80
-
-accept:
-	; Docstring: Accept an incoming connection
-	; Socketcall subcall: Accept (5)
-	; The C syntax for this label is:
-	; int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
-	; sockfd - still in good ol' ESI, addr is set to NULL since we don't care who the client is, addrlen is ignored since addr is NULL.
-	; ----
-	;
-	mov BYTE al, SYS_socketcall
-	mov ebx, SYS_ACCEPT
-	; push addrlen (0)
-	push edx
-	; push addr (0 - NULL)
-	push edx
-	; push sockfd
-	push esi
-	; Move the pointer to accept() args into ECX and make the API call
-	mov ecx, esp
-	int 0x80
-	mov [sock], eax
-
-fork:
-	; Docstring: Fork the process to emulate multithreading
-	; ----
-	mov eax, SYS_FORK
-	int 0x80
-	; If the return value is 0, we are in the child process
-	cmp eax, 0
-	jz readInput
+	; Bind socket
+	mov 	si, [port]
+	bind 	si, edi, sock
+	
+	; Listen to socket
+	listen 	sock
+	; Accept connection
+	accept 	NULL, NULL, sock
+	mov		[sock], eax
+	
+	; Get a GIOChannel from the socket's FD
+	push	dword [sock]
+	call	g_io_channel_unix_new
+	add 	esp, 4*1
+	
+	; Watch the socket for I/O
+	push	NULL
+	push	recv
+	;We want G_IO_IN condition - call recv when data is available to read
+	push	1
+	push	eax
+	call 	g_io_add_watch
+	add 	esp, 4 * 4
+	ret
 
 recv:
 	; Docstring: Accept an incoming connection
@@ -121,58 +184,84 @@ recv:
 	; Move the socket fd (of the client) to edx
 	;mov edx, [sock]
 	; push the flags (nothing in our case)
-	push 0
+	push	0
 	; push the length of data to read from socket
-	push 253
+	push 	253
 	; push the data buffer to read into
-	push buffer
+	push 	buffer
 	; push the client's socket fd
-	push dword [sock]
+	push 	dword [sock]
 	; Move the pointer to recv() args into ECX and make the API call
-	mov ecx, esp
-	mov eax, SYS_socketcall
-	mov ebx, SYS_RECV
-	int 0x80
-	cmp eax, -1
-	jz exit
-	cmp eax, 0
-	jz recv
+	mov 	ecx, esp
+	add 	esp, 4 * 4
+	mov 	eax, SYS_socketcall
+	mov 	ebx, SYS_RECV
+	int 	0x80
 	
-	mov esi, buffer
-	push eax
-	call cmpstr
-	cmp eax, 0
-	je recvExit
-	pop eax
+	; Append the recived data to the text view
+	push 	buffer
+	push 	dword [oChatView]
+	call 	AddTextToBuffer
+	add 	esp, 4 * 2
 	
-	mov edx, eax
-	mov ecx, buffer
-	call printOther
-	jmp recv
+	; Return true to avoid infinite loop
+	mov 	eax, 1
+	ret
 
-readInput:
-	; Get input from user
-	call userInput
-	; Move the socket's fd to edx
-	mov edx, [sock]
-	; Send it!
-	call send
+run_clicked:
+	push 	dword [oBindEntry]
+	call 	gtk_entry_get_text
+	add 	esp, 4 * 1
+	mov		esi, eax
+	mov		edi, sockaddr_in
+	call 	initIP
 	
-	;Check if the user want to quit
-	mov esi, out_buff
-	call cmpstr
-	cmp eax, 0
-	je exit
+	push 	dword [oPortEntry]
+	call 	gtk_entry_get_text
+	add 	esp, 4 * 1
+	mov		esi, eax
+	call 	initPort
 	
-	jmp readInput
-  
-section .data
-	%include "data.asm"
+	mov 	[port], eax
+	; Get socket
+	call 	setup_server
+	
+	push	dword [oDialog]
+	call	gtk_widget_hide
+	add 	esp, 4 * 1
+	
+	push    dword [oMain]
+    call    gtk_widget_show_all
+    add     esp, 4 * 1
+    ret
 
-section .bss
-	; The socket's file descriptor
-	sock resd 1
-	bind_addr resb 16
-	; The input and output buffers
-	buffer resb 254
-	out_buff resb 256
+event_clicked:
+	push 	dword [oEntry]
+	call 	gtk_entry_get_text_length
+	add 	esp, 4 * 1
+	mov 	ecx, eax
+	push 	dword [oEntry]
+	call 	gtk_entry_get_text
+	add 	esp, 4 * 1
+	mov 	edx, [sock]
+	call 	send
+
+	push	dword [oEntry]
+	push 	dword [oChatView]
+	call 	gtk_text_view_append
+	add 	esp, 4 * 2
+	
+	push 	szEmptyString
+	push 	dword [oEntry]
+	call 	gtk_entry_set_text
+	add 	esp, 4 * 2
+	ret
+
+event_delete:
+    call    gtk_main_quit
+    mov 	eax, 0
+    ret     
+
+event_destroy:    
+    call    gtk_main_quit
+    ret
