@@ -1,171 +1,77 @@
-global main
+;using sockets on linux with the 0x80 inturrprets.
+;
+;assemble
+;  nasm -o socket.o -f elf32 -g socket.asm
+;link
+;  ld -o socket socket.o
+;
+; My Version:
+;		nasm -o socket.o -f elf32 -g client.asm 
+;		ld -m elf_i386 socket.o -o client
 
+;
+
+;Just some assigns for better readability
+global _start
 %include "constants.asm"
 %include "util.asm"
 %include "sockets.asm"
-%include "macros.asm"
-%include "GUIMacros.asm"
-
-%assign NULL 0
-
-;GTK
-extern  gtk_init, gtk_builder_new, gtk_builder_add_from_file, gtk_builder_get_object
-extern gtk_builder_connect_signals, g_object_unref, gtk_widget_show, gtk_main, gtk_widget_destroy
-extern gtk_main_quit, g_signal_connect_data, gtk_text_view_set_buffer, gtk_text_buffer_set_text
-extern gtk_entry_set_text, gtk_entry_get_text, gtk_entry_get_text_length, gtk_widget_hide, gtk_dialog_run
-
-extern g_io_add_watch, g_io_channel_unix_new, g_timeout_add
-
-;Own functions
-extern gtk_text_view_append, AddTextToBuffer
-
-section .data
-	%include		"data.asm"
-	;~ ; GUI IDs
-    newString szIDDialog, 'clientDialog'
-    newString szIDipEntry, 'ipEntry'
-    newString szIDPortEntry, 'portEntry'
-    newString szIDConnectBtn, 'connectBtn'
-    
-    ; Events
-    szevent_delete      db  "delete-event", 0
-	szevent_destroy     db  "destroy", 0
-	szevent_clicked     db  "clicked", 0
-
-
-section .bss
-	; GUI Data
-    oBuilder 	resd 1
-    oMain 		resd 1
-    oMainGrid 	resd 1
-    oChatView 	resd 1
-    oSubGrid 	resd 1
-    oEntry 		resd 1
-    oSendBtn 	resd 1
-    oTextBuffer resd 1
-    oText 		resd 1
-    
-    ; Dialog Widgets
-    oDialog		resd 1
-    oDialogBtns	resd 1
-    oDialogGrid	resd 1
-    oTitle		resd 1
-    oIPGrid		resd 1
-    oIPLbl		resd 1
-    oIPEntry	resd 1
-    oPortEntry	resd 1
-    oConnectBtn	resd 1
-    
-    ; Socket data
-	sock		resd 1
-	sockaddr_in resb 16
-	port		resb 2
-	buffer 		resb 254
-	out_buff 	resb 256
-	
-	sockChannel resd 1
 
 section .text
-main:
-	; Call gtk_init with no arguments
-    push    0 
-    push    0
-    call    gtk_init
-    add     esp, 4 * 2   
-    
-    ; Get a GtkBuilder object
-    call    gtk_builder_new
-    mov     [oBuilder], eax
-    
-    ; Load Glade File into our GtkBuilder
-    push    NULL  
-    push    szGladeFile
-    push    eax 
-    call    gtk_builder_add_from_file
-    add     esp, 4 * 3 
-    
-    ; Add the dialog widget
-    addWidget oBuilder, szIDDialog, oDialog
-    
-    ; Add the IP text entry
-    addWidget oBuilder, szIDipEntry, oIPEntry
-    
-    ; Add the Port text entry
-    addWidget oBuilder, szIDPortEntry, oPortEntry
-    
-    ; Add the 'Connect' Button
-    addWidget oBuilder, szIDConnectBtn, oConnectBtn
 
-    ; Add The Top-Level Window
-    addWidget oBuilder, szIDMainWin, oMain
-    
-    ; Add the Main Grid
-    addWidget oBuilder, szIDMainGrid, oMainGrid
-    
-    ; Add the Text View to display the chat in
-    addWidget oBuilder, szIDchatView, oChatView
-    
-    ; Add the grid to contain the entry and send button
-    addWidget oBuilder, szIDSubGrid, oSubGrid
-    
-    ; Add the text entry widget
-    addWidget oBuilder, szIDEntry, oEntry
-    
-    ; Add the send button
-    addWidget oBuilder, szIDSendBtn, oSendBtn
-    
-    ; Connect the signals
-    push    dword [oBuilder]  
-    call    gtk_builder_connect_signals
-    add     esp, 4 * 1
-    
-    ; Events
-    ; Call 'event_delete' in case oMain is deleted
-    addEvent event_delete, szevent_delete, oMain
-    
-    ; Call 'event_destroy' in case oMain is destroyed
-    addEvent event_destroy, szevent_destroy, oMain
-    
-    ; Call 'send_click' in case oSendBtn is clicked
-    addEvent send_click, szevent_clicked, oSendBtn
-    
-    ; Call 'connect_click' in case oConnectBtn is pressed
-    addEvent connect_click, szevent_clicked, oConnectBtn
-    
-    ; Remove the refrence to the GtkBuilder (We won't need it anymore)
-    push    dword [oBuilder]
-    call    g_object_unref 
-    add     esp, 4 * 1   
-    
-    ; Run the Welcome Dialog
-    push	dword [oDialog]
-    call 	gtk_dialog_run
-    add esp, 4 * 1
-    
-    call    gtk_main
-    ret
-   
-setup_client:
-	mov 	[port], eax
-	call 	socket
-	mov 	[sock], eax
-	mov 	si, [port]
-	call 	connect
+;--------------------------------------------------
+;Main code body
+;--------------------------------------------------
+ 
+_start:
+	; Get the CLI arguments and parse it
+	pop ebx
+	; Verify that we got the expected number of arguments
+	cmp ebx, 2
+	jnz clientUsage
+	; Get the IP argument
+	pop ecx
+	pop ecx
+	mov esi, ecx
+	mov edi, sockaddr_in
+	call initIP
+	; Get the Port argument
+	mov esi, clientPort
+	call initPort
+	mov [port], eax
+
+start_client:
+	; Create and connect to the socket
+	call socket
+	mov [sock], eax
+	mov si, [port]
+	call connect
+	; If the connection failed for some reason, notify the user
+	cmp eax, 0
+	jnz fail
 	
-	; Get a GIOChannel from the socket's FD
-	push	dword [sock]
-	call	g_io_channel_unix_new
-	add 	esp, 4*1
+fork:
+	; Fork the two processes (Reading from the Terminal and reciving from the socket)
+	mov eax, SYS_FORK
+	int 0x80
+	cmp eax, 0
+	jz recv
+
+readInput:
+	; Get input from the user
+	call userInput
+	; Send the message over the socket
+	mov edx, [sock]
+	call send
 	
-	; Watch the socket for I/O
-	push	NULL
-	push	recv
-	;We want G_IO_IN condition - call recv when data is available to read
-	push	1
-	push	eax
-	call 	g_io_add_watch
-	add 	esp, 4 * 4
-	ret
+	;Check if the user want to quit
+	mov esi, out_buff
+	call cmpstr
+	cmp eax, 0
+	je exit
+	
+	; Thats it for today.
+	jmp readInput
 
 recv:
 	; Docstring: Accept an incoming connection
@@ -178,85 +84,47 @@ recv:
 	; Move the socket fd (of the client) to edx
 	;mov edx, [sock]
 	; push the flags (nothing in our case)
-	push	0
+	push 0
 	; push the length of data to read from socket
-	push 	253
+	push 253
 	; push the data buffer to read into
-	push 	buffer
+	push buffer
 	; push the client's socket fd
-	push 	dword [sock]
+	push dword [sock]
 	; Move the pointer to recv() args into ECX and make the API call
-	mov 	ecx, esp
-	add 	esp, 4 * 4
-	mov 	eax, SYS_socketcall
-	mov 	ebx, SYS_RECV
-	int 	0x80
+	mov ecx, esp
+	mov eax, SYS_socketcall
+	mov ebx, SYS_RECV
+	int 0x80
+	cmp eax, -1
+	jz fail
+	cmp eax, 0
+	jz exit
 	
-	; Append the recived data to the text view
-	push 	buffer
-	push 	dword [oChatView]
-	call 	AddTextToBuffer
-	add 	esp, 4 * 2
+	mov esi, buffer
+	push eax
+	call cmpstr
+	cmp eax, 0
+	je recvExit
+	pop eax
 	
-	; Return true to avoid infinite loop
-	mov 	eax, 1
-	ret
+	mov edx, eax
+	mov ecx, buffer
+	call printOther
+	jmp recv
 
-connect_click:
-	push 	dword [oIPEntry]
-	call 	gtk_entry_get_text
-	add 	esp, 4 * 1
-	mov		esi, eax
-	mov		edi, sockaddr_in
-	call 	initIP
-	
-	push 	dword [oPortEntry]
-	call 	gtk_entry_get_text
-	add 	esp, 4 * 1
-	mov		esi, eax
-	call 	initPort
-	call 	setup_client
-	
-	push	dword [oDialog]
-	call	gtk_widget_hide
-	add 	esp, 4 * 1
-	
-	push    dword [oMain]
-    call    gtk_widget_show
-    add     esp, 4 * 1
-	ret
 
-event_delete:
-	mov ecx, exitLen
-	mov eax, exitSTR
-	mov edx, [sock]
-	call send
-    call    gtk_main_quit
-    mov 	eax, 0
-    ret     
-
-event_destroy:    
-    call    gtk_main_quit
-    ret
-    
-send_click:
-	push 	dword [oEntry]
-	call 	gtk_entry_get_text_length
-	add 	esp, 4 * 1
-	mov 	ecx, eax
-	push 	dword [oEntry]
-	call 	gtk_entry_get_text
-	add 	esp, 4 * 1
-	mov 	edx, [sock]
-	call 	send
-
-	push	dword [oEntry]
-	push 	dword [oChatView]
-	call 	gtk_text_view_append
-	add 	esp, 4 * 2
-	
-	push 	szEmptyString
-	push 	dword [oEntry]
-	call 	gtk_entry_set_text
-	add 	esp, 4 * 2
-	ret
+section .data
+	%include "data.asm"
+	 
+section .bss
+	; Allocate uninitialized memory the socket we're going to create
+	sock         resd 1
+	; sockaddr_in is a C struct used by the sockets API to store information about the socket (Address family, port and address)
+	sockaddr_in resb 16
+	; socket port
+	port       resb 2
+	; data buffer
+	buffer resb 254
+	; The buffer to hold the user's data
+	out_buff resb 256

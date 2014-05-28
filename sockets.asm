@@ -18,10 +18,10 @@ socket:
 	push BYTE SOCK_STREAM
 	push BYTE AF_INET
 	mov ecx, esp
-	add esp, 4 * 3
 	; Call the socket API
 	int 0x80
 	; Align the stack to avoid seg. fault
+	add esp, 4 * 3
 	ret
 
 userInput:
@@ -51,7 +51,7 @@ send:
 	;
 	; Push the flags (none)
 	push dword 0
-	; Push the length (we stored it in ecx on 'readInput'
+	; Push the length (we stored it in ecx on 'readInput')
 	push ecx
 	; Push the data itself
 	push eax
@@ -77,7 +77,7 @@ recvExit:
 ;--------------------------------------------------
 ; Server Functions:
 ;--------------------------------------------------
-	
+
 
 ;--------------------------------------------------
 ; Client Functions:
