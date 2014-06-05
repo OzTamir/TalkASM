@@ -25,6 +25,3 @@ TalkASM is a simple instant-messaging (IM) utility written almost entirly in x86
  - sockets.asm: Sub-routines to ease Socket Actions
  - util.asm: Utilities sub-routines
  - util.c: An example of C/NASM interplay using few helper functions written in C
-
-### Note
-This repo is the result of a school-project I've worked on for few monthes now. The final result are in "Project" sub-directory, but the files in the main folder are subject to refactoring and are NOT the final project files.
