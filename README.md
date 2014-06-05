@@ -11,6 +11,7 @@ TalkASM is a simple instant-messaging (IM) utility written almost entirly in x86
 #### Main files:
  - client.asm: The client version of TalkASM
  - server.asm: The server version of TalkASM
+ - chat.glade: Glade XML file; Layout and UI definitions
 
 #### Data Files
  - constants.asm: Naming conventions for many int 80h calls (for readability)
