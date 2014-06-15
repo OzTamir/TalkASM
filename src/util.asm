@@ -64,14 +64,6 @@ readText:
 	int 0x80
 	ret
 
-exit:
-	; Docstring: Finish the run and return control to the OS
-	; ----
-	push 0x1
-	mov eax, 1
-	push eax
-	int 0x80
-
 print:
 	; Docstring: Print a string
 	; Args: String to print in ecx, it's length in edx

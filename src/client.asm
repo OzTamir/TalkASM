@@ -8,7 +8,7 @@ global	main
 %include	"GUIMacros.asm"
 
 ; Include the Gtk functions that we'll use 
-extern	gtk_init, gtk_builder_new, gtk_builder_add_from_file, gtk_builder_get_object
+extern	gtk_init, gtk_builder_new, gtk_builder_add_from_file, gtk_builder_get_object, exit
 extern	gtk_builder_connect_signals, g_object_unref, gtk_widget_show, gtk_main, gtk_widget_destroy
 extern	gtk_main_quit, g_signal_connect_data, gtk_text_view_set_buffer, gtk_text_buffer_set_text
 extern	gtk_entry_set_text, gtk_entry_get_text, gtk_entry_get_text_length, gtk_widget_hide, gtk_dialog_run
@@ -251,7 +251,7 @@ event_delete:
 	
 	; Quit the GUI
 	call	gtk_main_quit
-	mov	eax, 0
+	call	exit
 	ret     
 
 ; This is what happend when the GUI is destroyed
