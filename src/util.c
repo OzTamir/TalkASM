@@ -12,7 +12,7 @@ void gtk_text_view_append(GtkWidget *textview, GtkWidget *entry)
 	
 	// Get the text from the entry
 	buffer = gtk_entry_get_buffer(GTK_ENTRY(entry));
-	text = gtk_entry_buffer_get_text(buffer);
+	text = (gchar *)gtk_entry_buffer_get_text(buffer);
 	// Add it to the Text View
 	AddTextToBuffer(textview, text);
 }
