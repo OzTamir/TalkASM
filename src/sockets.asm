@@ -57,6 +57,10 @@ connect:
 	; ----
 	; Get the pointer to the socket address (sockaddr) from the source register (SI)
 	mov dx, si
+	; This has to do with the definition of the sockaddr_in structure
+	; To understand the offset, see initIP at 'util.asm'
+	; Notice how we always move the IP chars to [edi + 4]
+	; We don't use [edi + 1] as a starting point because we need to pad the sockaddr_in with zeros
 	mov byte [edi + 3], dl
 	mov byte [edi + 2], dh
 	; We are now calling connect, which takes three arguments: socket fd, pointer to sockaddr and the length of sockaddr.
