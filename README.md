@@ -1,10 +1,10 @@
-TalkASM - Simple Chat written in x86 NASM
+TalkASM - Web Chat written in x86 NASM
 ============
 
 ![TalkASM Preview](https://raw2.github.com/OzTamir/TalkASM/master/demo.png)
 
 ## Introduction
-TalkASM is a simple instant-messaging (IM) utility written almost entirly in x86 Assembly language (NASM) and is meant to be run on a Ubuntu host (both client and server). For a GUI I've used the great Gtk+ library.
+TalkASM is a instant-messaging (IM) utility written almost entirly in x86 Assembly language (NASM) and is meant to be run on a Ubuntu host (both client and server). For a GUI I've used the great Gtk+ library.
 
 ## Files
 
