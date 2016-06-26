@@ -208,6 +208,9 @@ recv:
 	call	AddTextToBuffer
 	add	esp, 4 * 2
 	
+	; Clear buffer
+	mov [buffer], dword 0
+	
 	; Return true to avoid infinite loop
 	mov	eax, 1
 	ret
